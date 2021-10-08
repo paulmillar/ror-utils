@@ -1,0 +1,213 @@
+# Run with
+#
+#   RMLMapper -o output.ttl -s turtle -m mapping.ttl
+#
+@prefix rml: <http://semweb.mmlab.be/ns/rml#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix ql: <http://semweb.mmlab.be/ns/ql#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix grid: <http://www.grid.ac/ontology/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix vivo: <http://vivoweb.org/ontology/core#> .
+
+@base <http://example.com/base/> .
+
+
+<TriplesMap>
+  a rr:TriplesMap;
+
+  rml:logicalSource [
+    rml:source "test-data.json";
+    #rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$.[*]"
+  ];
+
+#
+#  SUBJECT AND TYPE
+#
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class foaf:Organization
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate rdf:type;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      # REVISIT can we use the "grid:" prefix here?
+      rr:template "http://www.grid.ac/ontology/{types[*]}"
+    ]
+  ];
+
+
+#
+#  NAMES AND ALIASES
+#
+#  TODO add support for "labels"
+#
+
+  rr:predicateObjectMap [
+    rr:predicate skos:prefLabel;
+    rr:predicate rdfs:label;
+    rr:objectMap [
+      rml:reference "name"
+   ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate skos:altLabel;
+    rr:objectMap [
+      rml:reference "aliases[*]"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate vivo:abbreviation;
+    rr:objectMap [
+      rml:reference "acronyms[*]"
+    ]
+  ];
+
+#
+#    ESTABLISHED
+#
+
+  rr:predicateObjectMap [
+    rr:predicate grid:establishedYear;
+    rr:objectMap [
+      rr:datatype xsd:gYear;
+      rml:reference "established"
+    ]
+  ];
+
+
+#
+#   LOCATION
+#
+
+  rr:predicateObjectMap [
+    rr:predicate grid:countryCode;
+    rr:objectMap [
+      rml:reference "country.country_code"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:countryName;
+    rr:objectMap [
+      rml:reference "country.country_name"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:hasGeonamesCity;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rr:template "http://sws.geonames.org/{addresses[0].geonames_city.id}/"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:cityName;
+    rr:objectMap [
+      rml:reference "addresses[0].city"
+    ]
+  ];
+
+#
+#   EXTERNAL IDs
+#
+#   REVISIT: should the preferred link be stored differently?
+#
+#   TODO: add ROR id!
+#
+  rr:predicateObjectMap [
+    rr:predicate grid:isni;
+    rr:objectMap [
+      rml:reference "external_ids.ISNI.all[*]"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:crossrefFunderId;
+    rr:objectMap [
+      rml:reference "external_ids.FundRef.all[*]"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:hasWikidataId;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rr:template "http://www.wikidata.org/entity/{external_ids.Wikidata.all[*]}"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:id;
+    rr:objectMap [
+      rml:reference "external_ids.GRID.all"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:ukprn;
+    rr:objectMap [
+      rml:reference "external_ids.UKPRN.all[*]"
+    ]
+  ];
+
+
+ #
+ #   RELATIONSHIPS
+ #
+ #  TODO type == "Other"
+ #
+
+  rr:predicateObjectMap [
+    rr:predicate grid:hasRelated;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rml:reference "relationships[?(@.type==\"Related\")].id"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:hasChild;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rml:reference "relationships[?(@.type==\"Child\")].id"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:hasParent;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rml:reference "relationships[?(@.type==\"Parent\")].id"
+    ]
+  ];
+
+ #
+ #   WEB PAGES
+ #
+
+  rr:predicateObjectMap [
+    rr:predicate grid:wikipediaPage;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rml:reference "wikipedia_url"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate foaf:homepage;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rml:reference "links[*]"
+   ]
+  ].
