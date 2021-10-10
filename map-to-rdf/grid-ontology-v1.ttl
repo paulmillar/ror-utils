@@ -1,0 +1,160 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix dc11: <http://purl.org/dc/elements/1.1/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix grid: <http://www.grid.ac/ontology/> .
+
+grid: a owl:Ontology;
+  dc11:rights "This work is distributed under a Creative Commons Attribution 4.0 (CC BY 4.0) License <http://creativecommons.org/licenses/by/4.0/>."@en;
+  owl:versionInfo "1.0.3";
+  rdfs:comment "Created and maintained by the GRID Team, Digital Science and Research Ltd"@en;
+  dc11:date "2016-07-14T12:00:00Z";
+  rdfs:label "GRID Ontology version 1.0"@en;
+  dc11:publisher "Digital Science"@en.
+
+dc11:date a owl:AnnotationProperty.
+dc11:publisher a owl:AnnotationProperty.
+dc11:rights a owl:AnnotationProperty.
+
+<http://www.wikidata.org/ontology#Item> a owl:Class.
+<http://www.geonames.org/ontology#Feature> a owl:Class.
+
+grid:Address a owl:Class;
+  rdfs:comment "Information about the location of the organisation."@en;
+  rdfs:label "Address"@en.
+
+grid:Archive a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "Repository of documents, artifacts, or specimens. Includes libraries and museums that are not part of a university."@en;
+  rdfs:label "Archive"@en.
+
+grid:Company a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "Business entity with the aim of gaining profit."@en;
+  rdfs:label "Company"@en.
+
+grid:Education a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "An educational institution where research takes place. Can grant degrees and includes faculties, departments and schools."@en;
+  rdfs:label "Education"@en.
+
+grid:Facility a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "A building or facility dedicated to research of a specific area, usually contains specialised equipment. Includes telescopes, observatories and particle accelerators."@en;
+  rdfs:label "Facility"@en.
+
+grid:Government a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "An organisation operated mainly by the government of one or multiple countries."@en;
+  rdfs:label "Government"@en.
+
+grid:Healthcare a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "A health related facility where patients are treated. Includes hospitals, medical centres, health centres, treatment center. Includes trusts and healthcare systems."@en;
+  rdfs:label "Healthcare"@en.
+
+grid:Nonprofit a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "Organisation that uses its surplus revenue to achieve its goals. Includes charities and other non-government research funding bodies."@en;
+  rdfs:label "Nonprofit"@en.
+
+grid:Organisation a owl:Class;
+  rdfs:comment "The top-level concept in the GRID hierarchy of organisation types."@en;
+  rdfs:label "Organisation"@en.
+
+grid:Other a owl:Class;
+  rdfs:subClassOf grid:Organisation;
+  rdfs:comment "Used in cases where none of the other defined types are suitable."@en;
+  rdfs:label "Other"@en.
+
+grid:hasAddress a owl:ObjectProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range grid:Address;
+  rdfs:comment "Links organisations to their locations (as addresses)"@en;
+  rdfs:label "hasAddress"@en.
+
+grid:hasChild a owl:ObjectProperty;
+  owl:inverseOf grid:hasParent;
+  rdfs:domain grid:Organisation;
+  rdfs:range grid:Organisation;
+  rdfs:comment "Links organisation that are in a parent / child hierarchy"@en;
+  rdfs:label "hasChild"@en.
+
+grid:hasGeonamesCity a owl:ObjectProperty;
+  rdfs:domain grid:Address;
+  rdfs:range <http://www.geonames.org/ontology#Feature>;
+  rdfs:comment "Links the organisation's location to a Geonames identifier. In Geonames you can find region hierarchies, population statistics, geographic positions (lat / long) and more. See http://www.geonames.org/"@en;
+  rdfs:label "hasGeonamesCity"@en.
+
+grid:hasParent a owl:ObjectProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range grid:Organisation;
+  rdfs:comment "Links organisation that are in a parent / child hierarchy"@en;
+  rdfs:label "hasParent"@en.
+
+grid:hasRelated a owl:ObjectProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range grid:Organisation;
+  rdfs:comment "Link organisations that are related (e.g. affiliated, co-located, collaborators)"@en;
+  rdfs:label "hasRelated"@en.
+
+grid:hasWikidataID a owl:ObjectProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range <http://www.wikidata.org/ontology#Item>;
+  rdfs:comment "Links the  organisation to a wikidata entity. See https://www.wikidata.org"@en;
+  rdfs:label "hasWikidataId"@en.
+
+grid:cityName a owl:DatatypeProperty;
+  rdfs:domain grid:Address;
+  rdfs:range xsd:string;
+  rdfs:comment "The name of the city (in English if available)"@en;
+  rdfs:label "cityName"@en.
+
+grid:countryCode a owl:DatatypeProperty;
+  rdfs:domain grid:Address;
+  rdfs:range xsd:string;
+  rdfs:comment "ISO 3166-1 alpha-2"@en;
+  rdfs:label "countryCode"@en.
+
+grid:countryName a owl:DatatypeProperty;
+  rdfs:domain grid:Address;
+  rdfs:range xsd:string;
+  rdfs:comment "The name of the country or territory in English"@en;
+  rdfs:label "countryName"@en.
+
+grid:establishedYear a owl:DatatypeProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range xsd:gYear;
+  rdfs:comment "The year the organisation was established"@en;
+  rdfs:label "establishedYear"@en.
+
+grid:hasCrossrefFunderID a owl:DatatypeProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range xsd:string;
+  rdfs:comment """The Crossref Open Funder Registry Id for
+ the organisation. See http://www.crossref.org/fundingdata/registry.html"""@en;
+  rdfs:label "crossrefFunderId"@en.
+
+grid:hasISNI a owl:DatatypeProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range xsd:string;
+  rdfs:comment "The International Standard Name Identifier (ISNI) Id for the organisation. See http://isni.oclc.nl/"@en;
+  rdfs:label "isni"@en.
+
+grid:hasUKPRN a owl:DatatypeProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range xsd:string;
+  rdfs:comment "The UK Provider Reference Number (UKPRN) Id for the organisation. See https://www.ukrlp.co.uk/"@en;
+  rdfs:label "ukprn"@en.
+
+grid:id a owl:DatatypeProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:range xsd:string;
+  rdfs:comment "A unique, persistent id for the organisation"@en;
+  rdfs:label "id"@en.
+
+grid:wikipediaPage a owl:DatatypeProperty;
+  rdfs:domain grid:Organisation;
+  rdfs:comment "The Wikipedia page corresponding to this organisation"@en;
+  rdfs:label "wikipediaPage"@en.
+
