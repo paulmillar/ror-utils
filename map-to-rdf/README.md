@@ -1,4 +1,4 @@
-= map-to-rdf
+# map-to-rdf
 
 [Global Research Identifier Database (GRID)](https://www.grid.ac/)
 maintained a database of research organisations and provided that
@@ -16,7 +16,7 @@ there is an [open issue](ror-community/ror-api#113) to address this.
 This directory contains material to map the ROR-provided JSON data
 into a corresponding set of RDF triples.
 
-== Information organisation
+## Information organisation
 
 The information is expressed using the [GRID
 ontology](https://grid.ac/ontology/grid-ontology-v1.rdf).  This is
@@ -29,7 +29,7 @@ ontology, serialised using the turtle format.  This is (hopefully)
 easier to read than the RDF/XML serialisation that the is used in the
 [original file](https://grid.ac/ontology/grid-ontology-v1.rdf).
 
-=== Deviation from GRID RDF
+### Deviation from GRID RDF
 
 The RDF triples use the ROR identifiers as the predicate's subject,
 not the GRID identifier.  The GRID identifiers are asserted using the
@@ -39,14 +39,14 @@ interoperability for existing user.
 The address information is currently not converted.  This may be added
 later.
 
-== How to map the JSON data.
+## How to map the JSON data.
 
 The conversion from JSON to RDF uses [RDF Mapping Language
 (RML)](https://rml.io/specs/rml/) to describe how the different parts
 of the JSON data should be understood.  RML is intended to become a
 standard and is reasonably well documented.
 
-=== Problems and work-arounds
+### Problems and work-arounds
 
 The ROR data-dump contains many entries with a `wikipedia_url` entry
 that contains the empty string (`""`).  This does not work well with
@@ -62,7 +62,7 @@ paul@sprocket:~/ROR$ sed -ie 's/"wikipedia_url": "",/"wikipedia_url": null,/' 20
 This command updates the file `2021-09-23-ror-data.json` and creates a
 backup of the original contents as `2021-09-23-ror-data.jsone`.
 
-=== Running the conversion
+### Running the conversion
 
 The following command illustrates how to convert a ROR data-dump
 `2021-09-23-ror-data.json` into a corresponding set of RDF triples.

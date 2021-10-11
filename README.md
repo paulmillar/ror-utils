@@ -1,4 +1,4 @@
-== ROR utils ==
+# ROR utils
 
 The [Research Organization Registry (ROR)](https://ror.org/) is a
 community-led project to maintain a database of research institutes.
