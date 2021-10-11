@@ -19,25 +19,25 @@ into a corresponding set of RDF triples.
 ## Information organisation
 
 The information is expressed using the [GRID
-ontology](https://grid.ac/ontology/grid-ontology-v1.rdf).  This is
+ontology](http://owlgred.lumii.lv/online_visualization/6thw).  This is
 because, to a large extent, ROR inherited its database from GRID and
 there may be existing users for whom this ontology is already
 familiar.
 
 The file `grid-ontology-v1.ttl` contains a description of the GRID
-ontology, serialised using the turtle format.  This is (hopefully)
-easier to read than the RDF/XML serialisation that the is used in the
-[original file](https://grid.ac/ontology/grid-ontology-v1.rdf).
+ontology, serialised using the turtle format.  This is hopefully
+easier to read than [the RDF/XML
+serialisation](https://grid.ac/ontology/grid-ontology-v1.rdf) that
+GRID provides.
 
 ### Deviation from GRID RDF
 
 The RDF triples use the ROR identifiers as the predicate's subject,
 not the GRID identifier.  The GRID identifiers are asserted using the
 `grid:id` predicate, just as GRID did.  This may provide sufficient
-interoperability for existing user.
+interoperability for existing users.
 
-The address information is currently not converted.  This may be added
-later.
+The address information is currently not converted.
 
 ## How to map the JSON data.
 
