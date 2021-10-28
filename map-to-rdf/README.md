@@ -37,14 +37,23 @@ not the GRID identifier.  The GRID identifiers are asserted using the
 `grid:id` predicate, just as GRID did.  This may provide sufficient
 interoperability for existing users.
 
-The address information is currently not converted.
-
 ## How to map the JSON data.
 
 The conversion from JSON to RDF uses [RDF Mapping Language
 (RML)](https://rml.io/specs/rml/) to describe how the different parts
 of the JSON data should be understood.  RML is intended to become a
 standard and is reasonably well documented.
+
+### Additional functions
+
+The RML philosphy is that value transformations are enacted outside of
+RML, by using functions.  Some of the input values must be
+transformed.  To do this, the mapping makes use of the functions
+defined in the [RML Extra
+Functions](https://github.com/paulmillar/rml-extra-functions)
+repository.  Therefore, the jar file from that project must be built
+and the corresponding functions description (`functions.ttl`) needs to
+be on the RMLMapper command line.
 
 ### Problems and work-arounds
 
@@ -71,7 +80,7 @@ processor](https://github.com/RMLio/rmlmapper-java), an open-source
 RML processor.
 
 ```console
-paul@sprocket:~/ROR$ java -jar rmlmapper-4.12.0-r360-all.jar -o output.ttl -s turtle -m mapping.ttl
+paul@sprocket:~/ROR$ java -jar rmlmapper-4.12.0-r360-all.jar -f functions.ttl -o output.ttl -s turtle -m mapping.ttl
 paul@sprocket:~/ROR$
 ```
 
@@ -93,13 +102,10 @@ Here is an example entry from the resulting output:
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://ror.org/01js2sh04> a grid:Facility, foaf:Organization;
-  grid:cityName "Hamburg";
-  grid:countryCode "DE";
-  grid:countryName "Germany";
   grid:crossrefFunderId "501100001647";
   grid:establishedYear "1959"^^xsd:gYear;
+  grid:hasAddress "https://ror.org/01js2sh04/address-0";
   grid:hasChild <https://ror.org/02zmk8084>, <https://ror.org/04fme8709>;
-  grid:hasGeonamesCity <http://sws.geonames.org/2911298/>;
   grid:hasParent <https://ror.org/0281dp749>;
   grid:hasWikidataId <http://www.wikidata.org/entity/Q311801>, <http://www.wikidata.org/entity/Q39901428>;
   grid:id "grid.7683.a";
@@ -108,4 +114,10 @@ Here is an example entry from the resulting output:
   rdfs:label "Deutsches Elektronen-Synchrotron DESY";
   skos:prefLabel "Deutsches Elektronen-Synchrotron DESY";
   foaf:homepage <http://www.desy.de/index_eng.html> .
+
+<https://ror.org/01js2sh04/address-0> a grid:Address;
+  grid:cityName "Hamburg";
+  grid:countryCode "DE";
+  grid:countryName "Germany";
+  grid:hasGeonamesCity <http://sws.geonames.org/2911298/> .
 ```
