@@ -90,11 +90,16 @@ data-dump on my laptop.
 Here is an example entry from the resulting output:
 
 ```turtle
+@prefix fnml: <http://semweb.mmlab.be/ns/fnml#> .
+@prefix fno: <https://w3id.org/function/ontology#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#> .
+@prefix grel: <http://users.ugent.be/~bjdmeest/function/grel.ttl#> .
 @prefix grid: <http://www.grid.ac/ontology/> .
 @prefix ql: <http://semweb.mmlab.be/ns/ql#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ref: <https://github.com/paulmillar/rml-extra-functions#> .
 @prefix rml: <http://semweb.mmlab.be/ns/rml#> .
 @prefix rr: <http://www.w3.org/ns/r2rml#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
@@ -119,5 +124,7 @@ Here is an example entry from the resulting output:
   grid:cityName "Hamburg";
   grid:countryCode "DE";
   grid:countryName "Germany";
-  grid:hasGeonamesCity <http://sws.geonames.org/2911298/> .
+  grid:hasGeonamesCity <http://sws.geonames.org/2911298/>;
+  geo:lat "53.575833"^^xsd:float;
+  geo:long "9.879444"^^xsd:float .
 ```

@@ -16,6 +16,7 @@
 @prefix grel: <http://users.ugent.be/~bjdmeest/function/grel.ttl#> .
 @prefix fnml: <http://semweb.mmlab.be/ns/fnml#> .
 @prefix ref:  <https://github.com/paulmillar/rml-extra-functions#> .
+@prefix geo:  <http://www.w3.org/2003/01/geo/wgs84_pos#> .
 
 @base <http://example.com/base/> .
 
@@ -60,6 +61,22 @@
     rr:objectMap [
       rr:termType rr:IRI;
       rr:template "http://sws.geonames.org/{addresses[0].geonames_city.id}/"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate geo:lat;
+    rr:objectMap [
+      rr:datatype xsd:float;
+      rml:reference "addresses[0].lat"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate geo:long;
+    rr:objectMap [
+      rr:datatype xsd:float;
+      rml:reference "addresses[0].lng"
     ]
   ];
 
