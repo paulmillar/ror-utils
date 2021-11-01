@@ -55,22 +55,6 @@ repository.  Therefore, the jar file from that project must be built
 and the corresponding functions description (`functions.ttl`) needs to
 be on the RMLMapper command line.
 
-### Problems and work-arounds
-
-The ROR data-dump contains many entries with a `wikipedia_url` entry
-that contains the empty string (`""`).  This does not work well with
-RML and such values must first be converted to `null` values.
-
-One way to achieve this work-around with the data-dump
-`2021-09-23-ror-data.json` is the following command:
-
-```console
-paul@sprocket:~/ROR$ sed -ie 's/"wikipedia_url": "",/"wikipedia_url": null,/' 2021-09-23-ror-data.json
-```
-
-This command updates the file `2021-09-23-ror-data.json` and creates a
-backup of the original contents as `2021-09-23-ror-data.jsone`.
-
 ### Running the conversion
 
 The following command illustrates how to convert a ROR data-dump
