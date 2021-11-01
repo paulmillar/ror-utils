@@ -256,11 +256,32 @@
  #   WEB PAGES
  #
 
+  # Note: ROR currently uses a mixture of null and empty strings to
+  # represent missing 'wikipedia_url' values.  This is wrong and
+  # should be fixed in some future release of ROR.
+  #
+  # RMLMapper does not generate triples for any null values; however,
+  # it will try to map the empty string to a corresponding IRI.  This
+  # fails because an empty string is not a valid IRI.
+  #
+  # While waiting for ROR to fix this inconsistency, use the
+  # 'emptyToNull' function to handle any empty strings as if they were
+  # null.
+
   rr:predicateObjectMap [
     rr:predicate grid:wikipediaPage;
+
     rr:objectMap [
       rr:termType rr:IRI;
-      rml:reference "wikipedia_url"
+
+      fnml:functionValue [
+        rr:predicateObjectMap [
+          rr:predicate fno:executes ;
+          rr:object ref:emptyToNull ] ;
+        rr:predicateObjectMap [
+          rr:predicate ref:p_string_in ;
+          rr:objectMap [ rml:reference "wikipedia_url" ] ]
+      ]
     ]
   ];
 
