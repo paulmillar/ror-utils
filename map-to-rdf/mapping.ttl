@@ -20,6 +20,9 @@
 
 @base <http://example.com/base/> .
 
+##
+##  ADDRESSES
+##
 
 <AddressMap> a rr:TriplesMap;
   rml:logicalSource [
@@ -88,7 +91,11 @@
   ].
 
 
-<OrganizationMap> a rr:TriplesMap;
+##
+##  ORGANISATIONS
+##
+
+<OrganisationMap> a rr:TriplesMap;
 
   rml:logicalSource [
     #rml:source "test-data.json";
@@ -97,9 +104,9 @@
     rml:iterator "$.[*]"
   ];
 
-#
-#  SUBJECT AND TYPE
-#
+  #
+  # Subject and Type
+  #
   rr:subjectMap [
     rml:reference "id";
     rr:class foaf:Organization
@@ -109,18 +116,16 @@
     rr:predicate rdf:type;
     rr:objectMap [
       rr:termType rr:IRI;
-      # REVISIT can we use the "grid:" prefix here?
       rr:template "http://www.grid.ac/ontology/{types[*]}"
     ]
   ];
 
 
-#
-#  NAMES AND ALIASES
-#
-#  TODO add support for "labels"
-#
-
+  #
+  # Names and aliases.
+  #
+  # TODO add support for "labels"
+  #
   rr:predicateObjectMap [
     rr:predicate skos:prefLabel;
     rr:predicate rdfs:label;
@@ -143,10 +148,9 @@
     ]
   ];
 
-#
-#    ESTABLISHED
-#
-
+  #
+  #  Significant dates.
+  #
   rr:predicateObjectMap [
     rr:predicate grid:establishedYear;
     rr:objectMap [
@@ -156,10 +160,9 @@
   ];
 
 
-#
-#   LOCATION
-#
-
+  #
+  #   Location information.
+  #
   rr:predicateObjectMap [
     rr:predicate grid:hasAddress;
 
@@ -178,13 +181,11 @@
     ]
   ];
 
-#
-#   EXTERNAL IDs
-#
-#   REVISIT: should the preferred link be stored differently?
-#
-#   TODO: add ROR id!
-#
+  #
+  # Various IDs.
+  #
+  # TODO: add the ROR id.
+  #
   rr:predicateObjectMap [
     rr:predicate grid:isni;
     rr:objectMap [
@@ -222,12 +223,13 @@
   ];
 
 
- #
- #   RELATIONSHIPS
- #
- #  TODO type == "Other"
- #
-
+  #
+  # Relationships to other organisations.
+  #
+  # Note: the ROR data includes the relationship type "Other".  This
+  #       is a relic from GRID.  Such relationships are not supported
+  #       and will go away.
+  #
   rr:predicateObjectMap [
     rr:predicate grid:hasRelated;
     rr:objectMap [
@@ -252,22 +254,23 @@
     ]
   ];
 
- #
- #   WEB PAGES
- #
-
+  #
+  # Links to web pages.
+  #
   # Note: ROR currently uses a mixture of null and empty strings to
-  # represent missing 'wikipedia_url' values.  This is wrong and
-  # should be fixed in some future release of ROR.
+  #       represent missing 'wikipedia_url' values.  This is wrong and
+  #       will be fixed by only using null values in some future
+  #       release of ROR.
   #
-  # RMLMapper does not generate triples for any null values; however,
-  # it will try to map the empty string to a corresponding IRI.  This
-  # fails because an empty string is not a valid IRI.
+  #       RMLMapper does not generate triples for any null values;
+  #       however, it will try to map the empty string to a
+  #       corresponding IRI.  This fails because an empty string is
+  #       not a valid IRI.
   #
-  # While waiting for ROR to fix this inconsistency, use the
-  # 'emptyToNull' function to handle any empty strings as if they were
-  # null.
-
+  #       While waiting for ROR to fix this inconsistency, use the
+  #       'emptyToNull' function to handle any empty strings as if
+  #       they were null.
+  #
   rr:predicateObjectMap [
     rr:predicate grid:wikipediaPage;
 
@@ -276,11 +279,13 @@
 
       fnml:functionValue [
         rr:predicateObjectMap [
-          rr:predicate fno:executes ;
-          rr:object ref:emptyToNull ] ;
+          rr:predicate fno:executes;
+          rr:object ref:emptyToNull
+        ];
         rr:predicateObjectMap [
           rr:predicate ref:p_string_in ;
-          rr:objectMap [ rml:reference "wikipedia_url" ] ]
+          rr:objectMap [ rml:reference "wikipedia_url" ]
+        ]
       ]
     ]
   ];
@@ -290,5 +295,5 @@
     rr:objectMap [
       rr:termType rr:IRI;
       rml:reference "links[*]"
-   ]
+    ]
   ].
