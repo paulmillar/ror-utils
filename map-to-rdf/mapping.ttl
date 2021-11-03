@@ -17,6 +17,7 @@
 @prefix fnml: <http://semweb.mmlab.be/ns/fnml#> .
 @prefix ref:  <https://github.com/paulmillar/rml-extra-functions#> .
 @prefix geo:  <http://www.w3.org/2003/01/geo/wgs84_pos#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
 
 @base <http://example.com/base/> .
 
@@ -47,6 +48,13 @@
         rr:object "address-0" ]
     ] ;
     rr:termType rr:IRI
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate owl:sameAs;
+    rr:objectMap [
+      rr:template "http://www.grid.ac/institutes/{external_ids.GRID.all}/address-0"
+    ]
   ];
 
   rr:predicateObjectMap [
@@ -120,6 +128,15 @@
     ]
   ];
 
+  #
+  # Explicit link to GRID
+  #
+  rr:predicateObjectMap [
+    rr:predicate owl:sameAs;
+    rr:objectMap [
+      rr:template "http://www.grid.ac/institutes/{external_ids.GRID.all}"
+    ]
+  ];
 
   #
   # Names and aliases.
