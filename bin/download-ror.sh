@@ -15,16 +15,11 @@
 metadata_url="https://zenodo.org/api/records/?communities=ror-data&sort=mostrecent"
 zip_url=$(curl -s "$metadata_url" | jq -r '.hits.hits[0].files[0].links.self')
 zip_filename=${zip_url##*/}
-json_filename=${zip_filename%%.zip}.json
-
-if [ -f $json_filename ]; then
-    echo "The file $json_filename is the latest version and has already been downloaded."
-    exit 0
-fi
 
 echo "Downloading $zip_filename ..."
 curl -O $zip_url
 
+json_filename=$(unzip -l $zip_filename | tail -n +4 | head -n -2 | sort -n | tail -1 | awk '{print $4}')
 unzip -q -o $zip_filename $json_filename
 rm -f $zip_filename
 
