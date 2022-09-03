@@ -288,6 +288,10 @@
   #       'emptyToNull' function to handle any empty strings as if
   #       they were null.
   #
+  #       In addition, some URLs contain trailing whitespace, where
+  #       a space is an illegal character in a URL.  Therefore, use
+  #       the 'trim' function to handle such cases.
+  #
   rr:predicateObjectMap [
     rr:predicate grid:wikipediaPage;
 
@@ -300,8 +304,19 @@
           rr:object ref:emptyToNull
         ];
         rr:predicateObjectMap [
-          rr:predicate ref:p_string_in ;
-          rr:objectMap [ rml:reference "wikipedia_url" ]
+          rr:predicate ref:p_string_in;
+          rr:objectMap [
+            fnml:functionValue [
+              rr:predicateObjectMap [
+                rr:predicate fno:executes;
+                rr:object ref:trim
+              ];
+              rr:predicateObjectMap [
+                rr:predicate ref:p_string_in;
+                rr:objectMap [ rml:reference "wikipedia_url" ]
+              ]
+            ]
+	  ]
         ]
       ]
     ]
