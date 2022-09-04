@@ -172,7 +172,20 @@
     rr:predicate grid:establishedYear;
     rr:objectMap [
       rr:datatype xsd:gYear;
-      rml:reference "established"
+
+      # Note that xsd:gYear requires years to have the form YYYY, so
+      # we must zero-pad integer values.
+      fnml:functionValue [
+        rr:predicateObjectMap [
+          rr:predicate fno:executes ;
+          rr:object ref:withLeadingZeros ] ;
+        rr:predicateObjectMap [
+          rr:predicate ref:p_int_in ;
+          rr:objectMap [ rml:reference "established" ] ] ;
+        rr:predicateObjectMap [
+          rr:predicate ref:p_int_count ;
+          rr:object  "4" ]
+      ]
     ]
   ];
 
