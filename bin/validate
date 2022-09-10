@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+#
+#  Verify ROR JSON data dump.
+#
+
+import json
+import requests
+import concurrent.futures
+import sys
+from requests_futures.sessions import FuturesSession
+
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=20)
+session = FuturesSession(executor=executor)
+
+def check_result(future):
+    if future.cancelled():
+        return
+    org = future.ror_org
+    id = org["id"]
+    if future.done():
+        try:
+            r = future.result()
+            if r.is_redirect:
+                arrow = "===[PERM]===>" if r.is_permanent_redirect else "---[TEMP]--->"
+                org["bad_urls"][r.url] = "%s  %s" % (arrow, r.headers['location'])
+                #print("%s  %s  %s  %s" % (id, r.url, arrow, r.headers['location']))
+            elif not r.ok:
+                org["bad_urls"][r.url] = "%d %s" % (r.status_code, r.reason)
+                #print("%s  %s  %d %s" % (id, r.url, r.status_code, r.reason))
+        except requests.exceptions.ConnectionError as ce:
+            org["bad_urls"][ce.request.url] = "ConnectionError %s" % ce
+            #print("%s  %s %s" % (id, ce.request.url, ce))
+        except requests.exceptions.RequestException as re:
+            org["bad_urls"][re.request.url] = "RequestException %s" % re
+            #print("%s  %s %s" % (id, re.request.url, re))
+    else:
+        org.bad_urls[r.url] = "Weird future %s" % future
+        #print("Weird future state %s" % future)
+
+
+def start_head_req(org, url):
+    future = session.head(url)
+    future.ror_org = org
+    future.add_done_callback(check_result)
+    return future
+
+
+def validate_urls(org):
+    org["bad_urls"]={}
+    futures=[]
+    for url in urls_to_verify(org):
+        futures.append(start_head_req(org, url))
+    return futures
+
+
+def load_json(filename):
+    with open(filename) as f:
+        print("Loading %s" % filename)
+        return json.load(f)
+
+
+def urls_to_verify(org):
+    urls = []
+    for url in org["links"]:
+        urls.append(url)
+    wikipedia = org["wikipedia_url"]
+    if wikipedia:
+        urls.append(wikipedia)
+    return urls
+
+
+def print_progress(total, done, data):
+    problems=0
+    for org in data:
+        problems = problems + len(org["bad_urls"])
+    print("    %d (%d%%) URL checks completed.  Of the URLs checked, %d (%d%%) have a problem."
+          % (done, 100.0*done/total, problems, 100.0*problems/done))
+
+def validate_json(data):
+    print("Scheduling URL checks for %d organisations." % len(data))
+    try:
+        all_futures = []
+        for org in data:
+            new_futures = validate_urls(org)
+            all_futures.extend(new_futures)
+        print("%d URL checks have been queued." % len(all_futures))
+        while True:
+            (done, not_done) = concurrent.futures.wait(all_futures, timeout=2)
+            if len(not_done) == 0:
+                break
+            print_progress(len(all_futures), len(done), data)
+
+    except KeyboardInterrupt as e:
+        (done, not_done) = concurrent.futures.wait(all_futures, timeout=0)
+        print("Cancelling %d scheduled requests..." % len(not_done))
+        for future in not_done:
+            future.cancel()
+        executor.shutdown()
+        print("Clean-up done.")
+
+data = load_json('latest-ror-data.json')
+validate_json(data)
