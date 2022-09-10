@@ -100,6 +100,23 @@ def validate_json(data):
         print("Clean-up done.")
 
 
+def show_results(data):
+    bad_url_count = 0
+    org_count = 0
+    for org in data:
+        bad_urls = org["bad_urls"]
+        if len(bad_urls) > 0:
+            id = org["id"]
+            bad_url_count = bad_url_count + len(bad_urls)
+            org_count = org_count + 1
+            print("\n%s" % id)
+            for url, failure in bad_urls.items():
+                print("    %s" % url)
+                print("        %s" % failure)
+
+    print("\n%d bad URLs from %d organisations" % (bad_url_count,org_count))
+
+
 parser = argparse.ArgumentParser(description='Verify a ROR data-dump.')
 parser.add_argument('data', nargs='?', metavar='FILE', help="the ROR data-dump file.  If not specified then 'latest-ror-data.json' is used.",
                     default='latest-ror-data.json')
@@ -108,3 +125,4 @@ args = parser.parse_args()
 
 data = load_json(args.data)
 validate_json(data)
+show_results(data)
