@@ -8,6 +8,7 @@ import requests
 import concurrent.futures
 import sys
 from requests_futures.sessions import FuturesSession
+import argparse
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=40)
 session = FuturesSession(executor=executor)
@@ -98,5 +99,12 @@ def validate_json(data):
         executor.shutdown()
         print("Clean-up done.")
 
-data = load_json('latest-ror-data.json')
+
+parser = argparse.ArgumentParser(description='Verify a ROR data-dump.')
+parser.add_argument('data', nargs='?', metavar='FILE', help="the ROR data-dump file.  If not specified then 'latest-ror-data.json' is used.",
+                    default='latest-ror-data.json')
+
+args = parser.parse_args()
+
+data = load_json(args.data)
 validate_json(data)
