@@ -9,7 +9,7 @@ import concurrent.futures
 import sys
 from requests_futures.sessions import FuturesSession
 
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=20)
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=40)
 session = FuturesSession(executor=executor)
 
 def check_result(future):
