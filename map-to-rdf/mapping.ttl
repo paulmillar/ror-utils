@@ -301,9 +301,9 @@
   #       'emptyToNull' function to handle any empty strings as if
   #       they were null.
   #
-  #       In addition, some URLs contain trailing whitespace, where
-  #       a space is an illegal character in a URL.  Therefore, use
-  #       the 'trim' function to handle such cases.
+  #       In addition, ROR contains occational malformed URLs; e.g.,
+  #       ones that contain a trailing whitespace character.  As a
+  #       work-around, we use the 'recogniseUrl' function.
   #
   rr:predicateObjectMap [
     rr:predicate grid:wikipediaPage;
@@ -314,7 +314,7 @@
       fnml:functionValue [
         rr:predicateObjectMap [
           rr:predicate fno:executes;
-          rr:object ref:emptyToNull
+          rr:object ref:recogniseUrl
         ];
         rr:predicateObjectMap [
           rr:predicate ref:p_string_in;
@@ -322,7 +322,7 @@
             fnml:functionValue [
               rr:predicateObjectMap [
                 rr:predicate fno:executes;
-                rr:object ref:trim
+                rr:object ref:emptyToNull
               ];
               rr:predicateObjectMap [
                 rr:predicate ref:p_string_in;
@@ -336,10 +336,10 @@
   ];
 
 
-  # Note: ROR has occational links that contain a trailing whitespace
-  #       character.  [TODO: add URL for upstream report here.]  As
-  #       the space character is illegal within URL, this is a badly
-  #       formed URL.  As a work-around, we use the 'trim' function.
+  # Note: ROR has occational malformed URLs; e.g., ones that contain a
+  #       trailing whitespace character.  As a work-around, we use the
+  #       'recogniseUrl' function.
+  #
   rr:predicateObjectMap [
     rr:predicate foaf:homepage;
     rr:objectMap [
@@ -348,7 +348,7 @@
       fnml:functionValue [
         rr:predicateObjectMap [
           rr:predicate fno:executes;
-          rr:object ref:trim
+          rr:object ref:recogniseUrl
         ];
         rr:predicateObjectMap [
           rr:predicate ref:p_string_in ;
