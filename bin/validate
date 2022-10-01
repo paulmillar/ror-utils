@@ -11,9 +11,6 @@ from requests_futures.sessions import FuturesSession
 import argparse
 import validators
 
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=40)
-session = FuturesSession(executor=executor)
-
 def check_result(future):
     if future.cancelled():
         return
@@ -153,10 +150,18 @@ parser = argparse.ArgumentParser(description='Verify a ROR data-dump.')
 parser.add_argument('-o', metavar='FILE', help="where to write the output.  If not specified then results are written to stdout.")
 parser.add_argument('--offline', required=False,  action='store_true',
                     help="suppress any online tests.")
+parser.add_argument('--concurrency', required=False, type=int, metavar='N',
+                    default=40,
+                    help="The number of HTTP requests to run in parallel.")
 parser.add_argument('data', nargs='?', metavar='FILE', help="the ROR data-dump file.  If not specified then 'latest-ror-data.json' is used.",
                     default='latest-ror-data.json')
 
 args = parser.parse_args()
+
+concurrency = args.concurrency
+print("Running %d HTTP requests in parallel." % concurrency)
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency)
+session = FuturesSession(executor=executor)
 
 data = load_json(args.data)
 
