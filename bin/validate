@@ -56,7 +56,8 @@ def is_url_valid(org, url):
 
 def validate_url(org, url):
     if is_url_valid(org, url):
-        return start_head_req(org, url)
+        if not args.offline:
+            return start_head_req(org, url)
     else:
         #print("Invalid URL %s  \"%s\"" % (org["id"], url))
         org["bad_urls"][url] = "Invalid URL"
@@ -150,6 +151,8 @@ def show_results(data, output_filename):
 
 parser = argparse.ArgumentParser(description='Verify a ROR data-dump.')
 parser.add_argument('-o', metavar='FILE', help="where to write the output.  If not specified then results are written to stdout.")
+parser.add_argument('--offline', required=False,  action='store_true',
+                    help="suppress any online tests.")
 parser.add_argument('data', nargs='?', metavar='FILE', help="the ROR data-dump file.  If not specified then 'latest-ror-data.json' is used.",
                     default='latest-ror-data.json')
 
