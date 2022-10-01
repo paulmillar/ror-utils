@@ -36,7 +36,7 @@ def check_result(future):
             org["bad_urls"][re.request.url] = "RequestException %s" % re
             #print("%s  %s %s" % (id, re.request.url, re))
     else:
-        org.bad_urls[r.url] = "Weird future %s" % future
+        org["bad_urls"][r.url] = "Weird future %s" % future
         #print("Weird future state %s" % future)
 
 
