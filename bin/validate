@@ -9,6 +9,7 @@ import concurrent.futures
 import sys
 from requests_futures.sessions import FuturesSession
 import argparse
+import validators
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=40)
 session = FuturesSession(executor=executor)
@@ -46,11 +47,29 @@ def start_head_req(org, url):
     return future
 
 
+def is_url_valid(org, url):
+    result = validators.url(url, public=True)
+    if isinstance(result, validators.ValidationFailure):
+        return False
+    return result
+
+
+def validate_url(org, url):
+    if is_url_valid(org, url):
+        return start_head_req(org, url)
+    else:
+        #print("Invalid URL %s  \"%s\"" % (org["id"], url))
+        org["bad_urls"][url] = "Invalid URL"
+        return None
+
+
 def validate_urls(org):
     org["bad_urls"]={}
     futures=[]
     for url in urls_to_verify(org):
-        futures.append(start_head_req(org, url))
+        maybe_future = validate_url(org, url)
+        if maybe_future:
+            futures.append(maybe_future)
     return futures
 
 
