@@ -20,17 +20,19 @@ def check_result(future):
         try:
             r = future.result()
             if r.is_redirect:
-                arrow = "===[PERM]===>" if r.is_permanent_redirect else "---[TEMP]--->"
-                org["bad_urls"][r.url] = "%s  %s" % (arrow, r.headers['location'])
+                redirection_type = "Permanent" if r.is_permanent_redirect else "Temporary"
+                org["bad_urls"][r.url] = "%s direction to %s" % (redirection_type, r.headers['location'])
                 #print("%s  %s  %s  %s" % (id, r.url, arrow, r.headers['location']))
             elif not r.ok:
-                org["bad_urls"][r.url] = "%d %s" % (r.status_code, r.reason)
+                org["bad_urls"][r.url] = "HTTP status code %d %s" % (r.status_code, r.reason)
                 #print("%s  %s  %d %s" % (id, r.url, r.status_code, r.reason))
         except requests.exceptions.ConnectionError as ce:
-            org["bad_urls"][ce.request.url] = "ConnectionError %s" % ce
+            org["bad_urls"][ce.request.url] = "Error connecting %s" % ce
             #print("%s  %s %s" % (id, ce.request.url, ce))
+        except requests.exceptions.Timeout as t:
+            org["bad_urls"][t.request.url] = "Timeout making HTTP request %s" % t
         except requests.exceptions.RequestException as re:
-            org["bad_urls"][re.request.url] = "RequestException %s" % re
+            org["bad_urls"][re.request.url] = "Generic problem %s" % re
             #print("%s  %s %s" % (id, re.request.url, re))
     else:
         org["bad_urls"][r.url] = "Weird future %s" % future
