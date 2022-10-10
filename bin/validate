@@ -34,6 +34,8 @@ def redirection(response):
     if response.is_permanent_redirect:
         # e.g., JSESSIONID
         if "session" in location.lower():
+            # REVISIT, if "session" exists in initial URL then it may
+            # be OK.
             print("Vetoing redirection %s  -->  %s  as it contains \"session\"" % (response.url, location))
             return None
 
@@ -65,6 +67,9 @@ def check_result(future):
             redirect = redirection(r)
 
             if redirect:
+                # FIXME: should schedule another check, verifying the
+                # updated URL; for example, does the new location
+                # result in 404 status code?
                 org["bad_urls"][r.url] = "redirection to %s" % redirect
 
             elif not r.ok:
