@@ -8,8 +8,51 @@ import requests
 import concurrent.futures
 import sys
 from requests_futures.sessions import FuturesSession
+from urllib.parse import urljoin
 import argparse
 import validators
+
+def redirection(response):
+    """Use heuristics to establish whether the response to an HTTP HEAD
+    request indicates that the URL should be updated. Returns the
+    updated URL where appropriate, None otherwise.
+
+    In an ideal world, this method would simply check whether the
+    status code is 301 or 308.  However, there have been cases where
+    "obvious" permanent redirections (e.g., http:// --> https://) are
+    reported as a temporary redirection.  Likewise, there are websites
+    that use a permanent redirection to have the client include a
+    session key in the URL.
+
+    """
+    if not response.is_redirect:
+        return None
+
+    location_header = response.headers['location']
+    location = urljoin(response.url, location_header)
+
+    if response.is_permanent_redirect:
+        # e.g., JSESSIONID
+        if "session" in location.lower():
+            print("Vetoing redirection %s  -->  %s  as it contains \"session\"" % (response.url, location))
+            return None
+
+        return location
+    else:
+        before = response.url.split(':',1)
+        after = location.split(':',1)
+        if len(before) != 2:
+            print("Bad source URL: %s" % response.url)
+            return None
+        if len(after) != 2:
+            print("Bad redirection URL: %s" % location)
+            return None
+        if after[1] == before [1]:
+            #print("Promoting scheme-only redirection %s  -->  %s" % (response.url, location))
+            return location
+
+    return None
+
 
 def check_result(future):
     if future.cancelled():
@@ -19,23 +62,24 @@ def check_result(future):
     if future.done():
         try:
             r = future.result()
-            if r.is_redirect:
-                redirection_type = "Permanent" if r.is_permanent_redirect else "Temporary"
-                org["bad_urls"][r.url] = "%s direction to %s" % (redirection_type, r.headers['location'])
-                #print("%s  %s  %s  %s" % (id, r.url, arrow, r.headers['location']))
+            redirect = redirection(r)
+
+            if redirect:
+                org["bad_urls"][r.url] = "redirection to %s" % redirect
+
             elif not r.ok:
                 org["bad_urls"][r.url] = "HTTP status code %d %s" % (r.status_code, r.reason)
                 #print("%s  %s  %d %s" % (id, r.url, r.status_code, r.reason))
         except requests.exceptions.ConnectionError as ce:
-            org["bad_urls"][ce.request.url] = "Error connecting %s" % ce
+            org["bad_urls"][ce.request.url] = "Error connecting: %s" % ce
             #print("%s  %s %s" % (id, ce.request.url, ce))
         except requests.exceptions.Timeout as t:
-            org["bad_urls"][t.request.url] = "Timeout making HTTP request %s" % t
+            org["bad_urls"][t.request.url] = "Timeout making HTTP request: %s" % t
         except requests.exceptions.RequestException as re:
-            org["bad_urls"][re.request.url] = "Generic problem %s" % re
+            org["bad_urls"][re.request.url] = "Generic problem: %s" % re
             #print("%s  %s %s" % (id, re.request.url, re))
     else:
-        org["bad_urls"][r.url] = "Weird future %s" % future
+        org["bad_urls"][r.url] = "Weird  future %s" % future
         #print("Weird future state %s" % future)
 
 
