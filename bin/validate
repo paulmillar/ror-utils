@@ -11,6 +11,7 @@ from requests_futures.sessions import FuturesSession
 from urllib.parse import urljoin
 import argparse
 import validators
+import logging
 
 
 def is_scheme_only_redirect(before_url, after_url):
@@ -20,10 +21,10 @@ def is_scheme_only_redirect(before_url, after_url):
     before = before_url.split(':',1)
     after = after_url.split(':',1)
     if len(before) != 2:
-        print("Bad source URL: %s" % before_url)
+        logging.warning("Bad source URL: %s", before_url)
         return False # REVISIT: or raise exception?
     if len(after) != 2:
-        print("Bad redirection URL: %s" % after_url)
+        logging.warning("Bad redirection URL: %s", after_url)
         return False # REVISIT: or raise exception?
     return after[1] == before [1]
 
@@ -55,16 +56,14 @@ def redirection(response):
         # redirection.
         if "session" in location.lower():
             if not "session" in response.url.lower():
-                print("Vetoing redirection %s --> %s: adds a session token" %
-                      (response.url, location))
+                logging.warning("Vetoing redirection %s --> %s: adds a session token", response.url, location)
                 return None
             if not is_scheme_only_redirect(response.url, location):
-                print("Grudgingly accepting redirection %s --> %s: existing session token" %
-                      (response.url, location))
+                logging.info("Accepting redirection %s --> %s: existing session token", response.url, location)
 
         return location
     elif is_scheme_only_redirect(response.url, location):
-        #print("Promoting scheme-only redirection %s  -->  %s" % (response.url, location))
+        logging.debug("Promoting scheme-only redirection %s  -->  %s", response.url, location)
         return location
 
     return None
@@ -87,19 +86,19 @@ def check_result(future):
                 org["bad_urls"][r.url] = "redirection to %s" % redirect
 
             elif not r.ok:
+                logging.debug("%s  %s  %d %s", id, r.url, r.status_code, r.reason)
                 org["bad_urls"][r.url] = "HTTP status code %d %s" % (r.status_code, r.reason)
-                #print("%s  %s  %d %s" % (id, r.url, r.status_code, r.reason))
         except requests.exceptions.ConnectionError as ce:
+            logging.debug("%s  %s %s", id, ce.request.url, ce)
             org["bad_urls"][ce.request.url] = "Error connecting: %s" % ce
-            #print("%s  %s %s" % (id, ce.request.url, ce))
         except requests.exceptions.Timeout as t:
             org["bad_urls"][t.request.url] = "Timeout making HTTP request: %s" % t
         except requests.exceptions.RequestException as re:
+            logging.debug("%s  %s %s", id, re.request.url, re)
             org["bad_urls"][re.request.url] = "Generic problem: %s" % re
-            #print("%s  %s %s" % (id, re.request.url, re))
     else:
+        logging.warning("Weird future state %s", future)
         org["bad_urls"][r.url] = "Weird  future %s" % future
-        #print("Weird future state %s" % future)
 
 
 def start_head_req(org, url):
@@ -121,7 +120,7 @@ def validate_url(org, url):
         if not args.offline:
             return start_head_req(org, url)
     else:
-        #print("Invalid URL %s  \"%s\"" % (org["id"], url))
+        logging.debug("Invalid URL %s  \"%s\"", org["id"], url)
         org["bad_urls"][url] = "Invalid URL"
         return None
 
@@ -138,7 +137,7 @@ def validate_urls(org):
 
 def load_json(filename):
     with open(filename) as f:
-        print("Loading %s" % filename)
+        logging.info("Loading %s", filename)
         return json.load(f)
 
 
@@ -156,11 +155,11 @@ def print_progress(total, done, data):
     problems=0
     for org in data:
         problems = problems + len(org["bad_urls"])
-    print("    %d (%d%%) URL checks completed.  Of the URLs checked, %d (%d%%) have a problem."
-          % (done, 100.0*done/total, problems, 100.0*problems/done))
+    logging.info("    %d (%d%%) URL checks completed.  Of the URLs checked, %d (%d%%) have a problem.", done, 100.0*done/total, problems, 100.0*problems/done)
+
 
 def validate_json(data):
-    print("Scheduling URL checks for %d organisations." % len(data))
+    logging.info("Scheduling URL checks for %d organisations.", len(data))
     try:
         completed_checks_count=0
         not_done = []
@@ -168,7 +167,7 @@ def validate_json(data):
             new_futures = validate_urls(org)
             not_done.extend(new_futures)
         total_checks = len(not_done)
-        print("%d URL checks have been queued." % total_checks)
+        logging.info("%d URL checks have been queued.", total_checks)
         while True:
             (done, not_done) = concurrent.futures.wait(not_done, timeout=2)
             if len(not_done) == 0:
@@ -178,11 +177,11 @@ def validate_json(data):
 
     except KeyboardInterrupt as e:
         (done, not_done) = concurrent.futures.wait(not_done, timeout=0)
-        print("Cancelling %d scheduled requests..." % len(not_done))
+        logging.info("Cancelling %d scheduled requests...", len(not_done))
         for future in not_done:
             future.cancel()
         executor.shutdown()
-        print("Clean-up done.")
+        logging.info("Clean-up done.")
 
 
 def show_results(data, output_filename):
@@ -224,13 +223,18 @@ parser.add_argument('--concurrency', required=False, type=int, metavar='N',
 parser.add_argument('--timeout', required=False, type=int, metavar='SEC',
                     default=10,
                     help="The maximum time (in seconds) to allow for a request.")
+parser.add_argument('--debug', required=False, action='store_true',
+                    help="Provide more information about activity.")
 parser.add_argument('data', nargs='?', metavar='FILE', help="the ROR data-dump file.  If not specified then 'latest-ror-data.json' is used.",
                     default='latest-ror-data.json')
 
 args = parser.parse_args()
 
+logging.getLogger().setLevel(logging.DEBUG if args.debug else logging.INFO)
+logging.getLogger('urllib3').setLevel(logging.INFO)
+
 concurrency = args.concurrency
-print("Running %d HTTP requests in parallel." % concurrency)
+logging.info("Running %d HTTP requests in parallel.", concurrency)
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency)
 session = FuturesSession(executor=executor)
 
