@@ -12,6 +12,22 @@ from urllib.parse import urljoin
 import argparse
 import validators
 
+
+def is_scheme_only_redirect(before_url, after_url):
+    """Check whether a redirection involves changing only the scheme.
+    """
+
+    before = before_url.split(':',1)
+    after = after_url.split(':',1)
+    if len(before) != 2:
+        print("Bad source URL: %s" % before_url)
+        return False # REVISIT: or raise exception?
+    if len(after) != 2:
+        print("Bad redirection URL: %s" % after_url)
+        return False # REVISIT: or raise exception?
+    return after[1] == before [1]
+
+
 def redirection(response):
     """Use heuristics to establish whether the response to an HTTP HEAD
     request indicates that the URL should be updated. Returns the
@@ -32,26 +48,24 @@ def redirection(response):
     location = urljoin(response.url, location_header)
 
     if response.is_permanent_redirect:
-        # e.g., JSESSIONID
+        # Check if the redirection has added something that looks like
+        # a session ID (e.g., JSESSIONID).  If so, then ignore the
+        # redirection.  If both the original URL and the redirection
+        # target (location) have a session then accept the
+        # redirection.
         if "session" in location.lower():
-            # REVISIT, if "session" exists in initial URL then it may
-            # be OK.
-            print("Vetoing redirection %s  -->  %s  as it contains \"session\"" % (response.url, location))
-            return None
+            if not "session" in response.url.lower():
+                print("Vetoing redirection %s --> %s: adds a session token" %
+                      (response.url, location))
+                return None
+            if not is_scheme_only_redirect(response.url, location):
+                print("Grudgingly accepting redirection %s --> %s: existing session token" %
+                      (response.url, location))
 
         return location
-    else:
-        before = response.url.split(':',1)
-        after = location.split(':',1)
-        if len(before) != 2:
-            print("Bad source URL: %s" % response.url)
-            return None
-        if len(after) != 2:
-            print("Bad redirection URL: %s" % location)
-            return None
-        if after[1] == before [1]:
-            #print("Promoting scheme-only redirection %s  -->  %s" % (response.url, location))
-            return location
+    elif is_scheme_only_redirect(response.url, location):
+        #print("Promoting scheme-only redirection %s  -->  %s" % (response.url, location))
+        return location
 
     return None
 
