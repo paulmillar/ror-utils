@@ -176,12 +176,11 @@ def validate_json(data):
             print_progress(total_checks, completed_checks_count, data)
 
     except KeyboardInterrupt as e:
+        logging.warning("Shutting down...")
         (done, not_done) = concurrent.futures.wait(not_done, timeout=0)
-        logging.info("Cancelling %d scheduled requests...", len(not_done))
-        for future in not_done:
-            future.cancel()
-        executor.shutdown()
-        logging.info("Clean-up done.")
+        executor.shutdown(wait=True, cancel_futures=True)
+        logging.info("Interrupted when %d%% URL checks have completed.",
+                     100.0*(total_checks-len(not_done))/total_checks)
 
 
 def show_results(data, output_filename):
