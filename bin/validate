@@ -184,32 +184,28 @@ def validate_json(data):
 
 
 def show_results(data, output_filename):
-    if output_filename:
-        original_stdout = sys.stdout
-        sys.stdout = open(output_filename, 'w')
-    else:
-        original_stdout = None
+    out = open(output_filename, 'w') if output_filename else sys.stdout
 
     try:
+        results={}
         bad_url_count = 0
         org_count = 0
         for org in data:
             bad_urls = org["bad_urls"]
             if len(bad_urls) > 0:
                 id = org["id"]
+                results[id] = {}
+
                 bad_url_count = bad_url_count + len(bad_urls)
                 org_count = org_count + 1
-                print("\n%s" % id)
                 for url, failure in bad_urls.items():
-                    print("    %s" % url)
-                    print("        %s" % failure)
-
-        print("\n%d bad URLs from %d organisations" % (bad_url_count,org_count))
-
+                    results[id][url] = failure
+        json.dump(results, out, indent=4)
+        logging.info("Summary: found %d bad URLs from %d organisations" %
+                     (bad_url_count,org_count))
     finally:
-        if original_stdout:
-            sys.stdout.close()
-            sys.stdout = original_stdout
+        if output_filename:
+            out.close()
 
 
 parser = argparse.ArgumentParser(description='Verify a ROR data-dump.')
