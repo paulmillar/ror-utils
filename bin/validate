@@ -72,8 +72,7 @@ def redirection(response):
 def check_result(future):
     if future.cancelled():
         return
-    org = future.ror_org
-    id = org["id"]
+    results = future.results
     if future.done():
         try:
             r = future.result()
@@ -83,56 +82,56 @@ def check_result(future):
                 # FIXME: should schedule another check, verifying the
                 # updated URL; for example, does the new location
                 # result in 404 status code?
-                org["bad_urls"][r.url] = "redirection to %s" % redirect
+                results[r.url] = "redirection to %s" % redirect
 
             elif not r.ok:
-                logging.debug("%s  %s  %d %s", id, r.url, r.status_code, r.reason)
-                org["bad_urls"][r.url] = "HTTP status code %d %s" % (r.status_code, r.reason)
+                logging.debug("%s  %d %s", r.url, r.status_code, r.reason)
+                results[r.url] = "HTTP status code %d %s" % (r.status_code, r.reason)
         except requests.exceptions.ConnectionError as ce:
-            logging.debug("%s  %s %s", id, ce.request.url, ce)
-            org["bad_urls"][ce.request.url] = "Error connecting: %s" % ce
+            logging.debug("%s %s", ce.request.url, ce)
+            results[ce.request.url] = "Error connecting: %s" % ce
         except requests.exceptions.Timeout as t:
-            org["bad_urls"][t.request.url] = "Timeout making HTTP request: %s" % t
+            results[t.request.url] = "Timeout making HTTP request: %s" % t
         except requests.exceptions.RequestException as re:
-            logging.debug("%s  %s %s", id, re.request.url, re)
-            org["bad_urls"][re.request.url] = "Generic problem: %s" % re
+            logging.debug("%s %s", re.request.url, re)
+            results[re.request.url] = "Generic problem: %s" % re
     else:
         logging.warning("Weird future state %s", future)
-        org["bad_urls"][r.url] = "Weird  future %s" % future
+        results[r.url] = "Weird  future %s" % future
 
 
-def start_head_req(org, url):
+def start_head_req(results, url):
     future = session.head(url, timeout=args.timeout)
-    future.ror_org = org
+    future.results = results
     future.add_done_callback(check_result)
     return future
 
 
-def is_url_valid(org, url):
+def is_url_valid(url):
     result = validators.url(url, public=True)
     if isinstance(result, validators.ValidationFailure):
         return False
     return result
 
 
-def validate_url(org, url):
-    if is_url_valid(org, url):
+def validate_url(results, url):
+    if is_url_valid(url):
         if not args.offline:
-            return start_head_req(org, url)
+            return start_head_req(results, url)
     else:
-        logging.debug("Invalid URL %s  \"%s\"", org["id"], url)
-        org["bad_urls"][url] = "Invalid URL"
+        logging.debug("Invalid URL \"%s\"", url)
+        results[url] = "Invalid URL"
         return None
 
 
 def validate_urls(org):
-    org["bad_urls"]={}
+    results = {}
     futures=[]
     for url in urls_to_verify(org):
-        maybe_future = validate_url(org, url)
+        maybe_future = validate_url(results, url)
         if maybe_future:
             futures.append(maybe_future)
-    return futures
+    return (futures, results)
 
 
 def load_json(filename):
@@ -151,29 +150,34 @@ def urls_to_verify(org):
     return urls
 
 
-def print_progress(total, done, data):
+def print_progress(total, done, results):
     problems=0
-    for org in data:
-        problems = problems + len(org["bad_urls"])
+    for org_results in results.values():
+        problems = problems + len(org_results)
     logging.info("    %d (%d%%) URL checks completed.  Of the URLs checked, %d (%d%%) have a problem.", done, 100.0*done/total, problems, 100.0*problems/done)
 
 
 def validate_json(data):
     logging.info("Scheduling URL checks for %d organisations.", len(data))
+    results = {}
     try:
         completed_checks_count=0
         not_done = []
         for org in data:
-            new_futures = validate_urls(org)
+            (new_futures, org_results) = validate_urls(org)
+            id = org["id"]
+            results[id] = org_results
             not_done.extend(new_futures)
         total_checks = len(not_done)
+
         logging.info("%d URL checks have been queued.", total_checks)
         while True:
             (done, not_done) = concurrent.futures.wait(not_done, timeout=2)
             if len(not_done) == 0:
                 break
             completed_checks_count = completed_checks_count + len(done)
-            print_progress(total_checks, completed_checks_count, data)
+            print_progress(total_checks, completed_checks_count, results)
+        return results;
 
     except KeyboardInterrupt as e:
         logging.warning("Shutting down...")
@@ -181,30 +185,23 @@ def validate_json(data):
         executor.shutdown(wait=True, cancel_futures=True)
         logging.info("Interrupted when %d%% URL checks have completed.",
                      100.0*(total_checks-len(not_done))/total_checks)
+        return results;
 
 
-def show_results(data, output_filename):
-    out = open(output_filename, 'w') if output_filename else sys.stdout
+def post_process_results(results):
+    new_results = {}
+    for key, value in results.items():
+        if bool(value):
+            new_results[key] = value
+    return new_results
 
+
+def show_results(results):
+    out = open(args.o, 'w') if args.o else sys.stdout
     try:
-        results={}
-        bad_url_count = 0
-        org_count = 0
-        for org in data:
-            bad_urls = org["bad_urls"]
-            if len(bad_urls) > 0:
-                id = org["id"]
-                results[id] = {}
-
-                bad_url_count = bad_url_count + len(bad_urls)
-                org_count = org_count + 1
-                for url, failure in bad_urls.items():
-                    results[id][url] = failure
         json.dump(results, out, indent=4)
-        logging.info("Summary: found %d bad URLs from %d organisations" %
-                     (bad_url_count,org_count))
     finally:
-        if output_filename:
+        if args.o:
             out.close()
 
 
@@ -234,6 +231,6 @@ executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency)
 session = FuturesSession(executor=executor)
 
 data = load_json(args.data)
-
-validate_json(data)
-show_results(data, args.o)
+results = validate_json(data)
+results2 = post_process_results(results)
+show_results(results2)
