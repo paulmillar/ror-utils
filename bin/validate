@@ -69,39 +69,68 @@ def redirection(response):
     return None
 
 
+def append_url_result(org_results, label, url, problem, description, **extra):
+    result = {}
+    result["url"] = url
+    result["problem_class"] = problem
+    result["description"] = description
+    for k,v in extra.items():
+        result[k] = v
+    if not label in org_results:
+        org_results[label] = []
+    org_results[label].append(result)
+
+
 def check_result(future):
     if future.cancelled():
         return
     results = future.results
+    label = future.label
     if future.done():
         try:
             r = future.result()
             redirect = redirection(r)
 
             if redirect:
+                append_url_result(results, label, r.url,
+                                  "REDIRECTION",
+                                  "Server's reply indicates the URL is out-of-date and provided an updated URL",
+                                  updated_url=redirect)
                 # FIXME: should schedule another check, verifying the
                 # updated URL; for example, does the new location
                 # result in 404 status code?
-                results[r.url] = "redirection to %s" % redirect
-
             elif not r.ok:
-                logging.debug("%s  %d %s", r.url, r.status_code, r.reason)
-                results[r.url] = "HTTP status code %d %s" % (r.status_code, r.reason)
+                logging.debug("%s %d %s", r.url, r.status_code, r.reason)
+                # REVISIT: do we want to be more specific here?  For example, mapping
+                # a 404 status code to a distinct problem class?
+                append_url_result(results, label, r.url,
+                                  "HTTP",
+                                  "Web-server's reply indicates a problem: %d %s"
+                                  % (r.status_code, r.reason))
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
-            results[ce.request.url] = "Error connecting: %s" % ce
+            append_url_result(results, label, ce.request.url,
+                              "CONNECTION",
+                              "Problem connecting to web-server: " + str(ce))
         except requests.exceptions.Timeout as t:
-            results[t.request.url] = "Timeout making HTTP request: %s" % t
+            append_url_result(results, label, t.request.url,
+                              "TIMEOUT",
+                              "Web-server took too long to reply: " + str(t))
         except requests.exceptions.RequestException as re:
             logging.debug("%s %s", re.request.url, re)
-            results[re.request.url] = "Generic problem: %s" % re
+            append_url_result(results, label, re.request.url,
+                              "GENERIC",
+                              "Something went wrong when contacting the web-server: " + str(re))
     else:
         logging.warning("Weird future state %s", future)
-        results[r.url] = "Weird  future %s" % future
+        append_url_result(results, label, r.url,
+                          "INTERNAL",
+                          "Weird future: " + str(future))
 
 
-def start_head_req(results, url):
+def start_head_req(results, label, url):
     future = session.head(url, timeout=args.timeout)
+    future.label = label
     future.results = results
     future.add_done_callback(check_result)
     return future
@@ -114,21 +143,22 @@ def is_url_valid(url):
     return result
 
 
-def validate_url(results, url):
+def validate_url(results, label, url):
     if is_url_valid(url):
         if not args.offline:
-            return start_head_req(results, url)
+            return start_head_req(results, label, url)
     else:
         logging.debug("Invalid URL \"%s\"", url)
-        results[url] = "Invalid URL"
+        append_url_result(results, label, url, "BAD URL",
+                          "The text is not a valid URL.")
         return None
 
 
 def validate_urls(org):
     results = {}
     futures=[]
-    for url in urls_to_verify(org):
-        maybe_future = validate_url(results, url)
+    for label, url in urls_to_verify(org):
+        maybe_future = validate_url(results, label, url)
         if maybe_future:
             futures.append(maybe_future)
     return (futures, results)
@@ -142,11 +172,15 @@ def load_json(filename):
 
 def urls_to_verify(org):
     urls = []
+    i = 1
     for url in org["links"]:
-        urls.append(url)
+        label = "links[%d]" % i
+        urls.append((label,url))
+        i += 1
     wikipedia = org["wikipedia_url"]
     if wikipedia:
-        urls.append(wikipedia)
+        label = "wikipedia_url"
+        urls.append((label,wikipedia))
     return urls
 
 
