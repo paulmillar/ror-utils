@@ -13,6 +13,9 @@ import argparse
 import validators
 import logging
 
+# Global list of pending URL-checking futures.
+futures_not_done = []
+
 
 def is_scheme_only_redirect(before_url, after_url):
     """Check whether a redirection involves changing only the scheme.
@@ -96,9 +99,11 @@ def check_result(future):
                                   "REDIRECTION",
                                   "Server's reply indicates the URL is out-of-date and provided an updated URL",
                                   updated_url=redirect)
-                # FIXME: should schedule another check, verifying the
-                # updated URL; for example, does the new location
-                # result in 404 status code?
+
+                # FIXME: The following start_head_req call doesn't work
+                #        for unknown reasons.
+                #
+                #start_head_req(results, label, redirect)
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
                 # REVISIT: do we want to be more specific here?  For example, mapping
@@ -129,11 +134,12 @@ def check_result(future):
 
 
 def start_head_req(results, label, url):
+    global futures_not_done
     future = session.head(url, timeout=args.timeout)
     future.label = label
     future.results = results
     future.add_done_callback(check_result)
-    return future
+    futures_not_done.append(future)
 
 
 def is_url_valid(url):
@@ -146,22 +152,18 @@ def is_url_valid(url):
 def validate_url(results, label, url):
     if is_url_valid(url):
         if not args.offline:
-            return start_head_req(results, label, url)
+            start_head_req(results, label, url)
     else:
         logging.debug("Invalid URL \"%s\"", url)
         append_url_result(results, label, url, "BAD URL",
                           "The text is not a valid URL.")
-        return None
 
 
 def validate_urls(org):
     results = {}
-    futures=[]
     for label, url in urls_to_verify(org):
-        maybe_future = validate_url(results, label, url)
-        if maybe_future:
-            futures.append(maybe_future)
-    return (futures, results)
+        validate_url(results, label, url)
+    return results
 
 
 def load_json(filename):
@@ -188,37 +190,37 @@ def print_progress(total, done, results):
     problems=0
     for org_results in results.values():
         problems = problems + len(org_results)
-    logging.info("    %d (%d%%) URL checks completed.  Of the URLs checked, %d (%d%%) have a problem.", done, 100.0*done/total, problems, 100.0*problems/done)
-
+    logging.info("    %d (%d%%) URL checks (of %d) completed.  Of the URLs checked, %d (%d%%) have a problem.", done, 100.0*done/total, total, problems, 100.0*problems/done)
 
 def validate_json(data):
+    global futures_not_done
     logging.info("Scheduling URL checks for %d organisations.", len(data))
     results = {}
     try:
         completed_checks_count=0
-        not_done = []
         for org in data:
-            (new_futures, org_results) = validate_urls(org)
+            org_results = validate_urls(org)
             id = org["id"]
             results[id] = org_results
-            not_done.extend(new_futures)
-        total_checks = len(not_done)
 
-        logging.info("%d URL checks have been queued.", total_checks)
+        logging.info("%d URL checks have been queued.", len(futures_not_done))
         while True:
-            (done, not_done) = concurrent.futures.wait(not_done, timeout=2)
-            if len(not_done) == 0:
+            (done, futures_not_done) = concurrent.futures.wait(futures_not_done, timeout=2)
+            if len(futures_not_done) == 0:
                 break
-            completed_checks_count = completed_checks_count + len(done)
+            completed_checks_count += len(done)
+            total_checks = completed_checks_count + len(futures_not_done)
             print_progress(total_checks, completed_checks_count, results)
         return results;
 
     except KeyboardInterrupt as e:
         logging.warning("Shutting down...")
-        (done, not_done) = concurrent.futures.wait(not_done, timeout=0)
+        (done, futures_not_done) = concurrent.futures.wait(futures_not_done, timeout=0)
         executor.shutdown(wait=True, cancel_futures=True)
+        completed_checks_count += len(done)
+        total_checks = completed_checks_count + len(futures_not_done)
         logging.info("Interrupted when %d%% URL checks have completed.",
-                     100.0*(total_checks-len(not_done))/total_checks)
+                     100.0*(total_checks-len(futures_not_done))/total_checks)
         return results;
 
 
