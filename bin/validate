@@ -332,16 +332,13 @@ def post_process_results(results):
 
 
 def show_results(results):
-    out = open(args.o, 'w') if args.o else sys.stdout
-    try:
+    with open(args.o, 'w') as out:
         json.dump(results, out, indent=4)
-    finally:
-        if args.o:
-            out.close()
 
 
 parser = argparse.ArgumentParser(description='Verify a ROR data-dump.')
-parser.add_argument('-o', metavar='FILE', help="where to write the output.  If not specified then results are written to stdout.")
+parser.add_argument('-o', metavar='FILE', default="ror-report.json",
+                    help="where to write the output.  If not specified then results are written to 'ror-report.json'.")
 parser.add_argument('--offline', required=False,  action='store_true',
                     help="suppress any online tests.")
 parser.add_argument('--concurrency', required=False, type=int, metavar='N',
