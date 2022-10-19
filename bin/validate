@@ -214,11 +214,9 @@ def validate_url(results, label, url):
         start_head_req(results, label, url)
 
 
-def validate_urls(org):
-    results = {}
+def validate_urls(org_results, org):
     for label, url in urls_to_verify(org):
-        validate_url(results, label, url)
-    return results
+        validate_url(org_results, label, url)
 
 
 def load_json(filename):
@@ -320,9 +318,10 @@ def validate_json(data):
     try:
         completed_checks_count=0
         for org in data:
-            org_results = validate_urls(org)
             id = org["id"]
+            org_results = {}
             results[id] = org_results
+            validate_urls(org_results, org)
             validate_org(org_results, org)
 
         logging.info("%d URL checks have been queued.", len(futures_not_done))
