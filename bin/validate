@@ -242,13 +242,12 @@ def print_progress(total, done, results):
 def is_established_year_ok(id, year):
     """Use heuristics to check whether a year is "likely"
     """
-    # TODO: verify the following entries
-    #  ID                         YEAR
-    #  https://ror.org/05htk5m33  976
-    #  https://ror.org/05fnp1145  970
-    #
     if id == "https://ror.org/021v42516": # if Glastonbury Abbey
         return year == 712
+    if id == "https://ror.org/05htk5m33": # if Hunan University
+        return year == 976
+    if id == "https://ror.org/05fnp1145": # if Al-Azhar University
+        return abs(year-972) < 10  # circa 972
     return year >= 1000
 
 
