@@ -195,13 +195,14 @@ def is_url_valid(url):
 
 
 def validate_url(results, label, url):
-    if is_url_valid(url):
-        if not args.offline:
-            start_head_req(results, label, url)
-    else:
+    if not is_url_valid(url):
         logging.debug("Invalid URL \"%s\"", url)
         append_problem(results, label, url, "BAD VALUE",
                           "The value is not a valid URL.")
+        return
+
+    if not args.offline:
+        start_head_req(results, label, url)
 
 
 def validate_urls(org):
