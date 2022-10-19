@@ -96,35 +96,35 @@ def redirection(response):
 
 
 def build_missing_value_problem(**extra):
-    result = {}
-    result["problem_class"] = "MISSING VALUE"
-    result["description"] = "A required value is missing"
+    problem = {}
+    problem["problem_class"] = "MISSING VALUE"
+    problem["description"] = "A required value is missing"
     for k,v in extra.items():
-        result[k] = v
-    return result
+        problem[k] = v
+    return problem
 
 
 def build_problem(value, problem_class, description, **extra):
-    result = {}
-    result["value"] = value
-    result["problem_class"] = problem_class
-    result["description"] = description
+    problem = {}
+    problem["value"] = value
+    problem["problem_class"] = problem_class
+    problem["description"] = description
     for k,v in extra.items():
-        result[k] = v
-    return result
+        problem[k] = v
+    return problem
 
 
-def append_problem(org_results, label, value, problem_class, description, **extra):
-    result = build_problem(value, problem_class, description, **extra)
-    if not label in org_results:
-        org_results[label] = []
-    org_results[label].append(result)
+def append_problem(org_problems, label, value, problem_class, description, **extra):
+    problem = build_problem(value, problem_class, description, **extra)
+    if not label in org_problems:
+        org_problems[label] = []
+    org_problems[label].append(problem)
 
 
 def check_result(future):
     if future.cancelled():
         return
-    results = future.results
+    problems = future.problems
     label = future.label
     if future.done():
         try:
@@ -132,7 +132,7 @@ def check_result(future):
             redirect = redirection(r)
 
             if redirect:
-                append_problem(results, label, r.url,
+                append_problem(problems, label, r.url,
                                "REDIRECTION",
                                "Server's reply indicates the URL is out-of-date and provided an updated URL",
                                updated_url=redirect)
@@ -140,58 +140,58 @@ def check_result(future):
                 # FIXME: The following start_head_req call doesn't work
                 #        for unknown reasons.
                 #
-                #start_head_req(results, label, redirect)
+                #start_head_req(problems, label, redirect)
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
 
                 if r.status_code == 401:
-                    append_problem(results, label, r.url,
+                    append_problem(problems, label, r.url,
                                    "PERMISSION",
                                    "The server requires authentication to allow access to the resource.")
                 if r.status_code == 403:
-                    append_problem(results, label, r.url,
+                    append_problem(problems, label, r.url,
                                    "PERMISSION",
                                    "The server understood the request, but is refusing to authorize it.")
                 elif r.status_code == 404:
-                    append_problem(results, label, r.url,
+                    append_problem(problems, label, r.url,
                                    "MISSING",
                                    "The server could not find this resource, which may be because of a temporary problem.")
                 elif r.status_code == 410:
-                    append_problem(results, label, r.url,
+                    append_problem(problems, label, r.url,
                                    "MISSING",
                                    "The server asserts this resource has been permanently removed.")
                 else:
                     # REVISIT: do we want more specific cases here?
-                    append_problem(results, label, r.url,
+                    append_problem(problems, label, r.url,
                                    "HTTP",
                                    "Web-server indicated a problem: %d %s"
                                    % (r.status_code, r.reason))
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
-            append_problem(results, label, ce.request.url,
+            append_problem(problems, label, ce.request.url,
                            "CONNECTION",
                            "Problem connecting to web-server: " + str(ce))
         except requests.exceptions.Timeout as t:
-            append_problem(results, label, t.request.url,
+            append_problem(problems, label, t.request.url,
                            "TIMEOUT",
                            "Web-server took too long to reply: " + str(t))
         except requests.exceptions.RequestException as re:
             logging.debug("%s %s", re.request.url, re)
-            append_problem(results, label, re.request.url,
+            append_problem(problems, label, re.request.url,
                            "GENERIC",
                            "Something went wrong when contacting the web-server: " + str(re))
     else:
         logging.warning("Weird future state %s", future)
-        append_problem(results, label, r.url,
+        append_problem(problems, label, r.url,
                        "INTERNAL",
                        "Weird future: " + str(future))
 
 
-def start_head_req(results, label, url):
+def start_head_req(problems, label, url):
     global futures_not_done
     future = session.head(url, timeout=args.timeout)
     future.label = label
-    future.results = results
+    future.problems = problems
     future.add_done_callback(check_result)
     futures_not_done.append(future)
 
@@ -203,20 +203,20 @@ def is_url_valid(url):
     return result
 
 
-def validate_url(results, label, url):
+def validate_url(problems, label, url):
     if not is_url_valid(url):
         logging.debug("Invalid URL \"%s\"", url)
-        append_problem(results, label, url, "BAD VALUE",
+        append_problem(problems, label, url, "BAD VALUE",
                           "The value is not a valid URL.")
         return
 
     if not args.offline:
-        start_head_req(results, label, url)
+        start_head_req(problems, label, url)
 
 
-def validate_urls(org_results, org):
+def validate_urls(org_problems, org):
     for label, url in urls_to_verify(org):
-        validate_url(org_results, label, url)
+        validate_url(org_problems, label, url)
 
 
 def load_json(filename):
@@ -239,11 +239,9 @@ def urls_to_verify(org):
     return urls
 
 
-def print_progress(total, done, results):
-    problems=0
-    for org_results in results.values():
-        problems = problems + len(org_results)
-    logging.info("    %d (%d%%) URL checks (of %d) completed.  Of the URLs checked, %d (%d%%) have a problem.", done, 100.0*done/total, total, problems, 100.0*problems/done)
+def print_progress(total, done):
+    logging.info("    %d (%d%%) URL checks (of %d) completed.",
+                 done, 100.0*done/total, total)
 
 
 def is_established_year_ok(id, year):
@@ -258,42 +256,42 @@ def is_established_year_ok(id, year):
     return year >= 1000
 
 
-def validate_org(org_results, org):
+def validate_org(org_problems, org):
     if "types" in org:
         i = 1
         for type in org["types"]:
             if not type in VALID_ORG_TYPES:
                 label = "types[%d]" % i
-                result = build_problem(type, "BAD VALUE",
+                problem = build_problem(type, "BAD VALUE",
                                        "Not one of the allowed values")
-                org_results[label] = result
+                org_problems[label] = problem
             i += 1
     else:
-        org_results["types"] = build_missing_value_problem()
+        org_problems["types"] = build_missing_value_problem()
 
 
     if "status" in org:
         status = org["status"]
         if not status in VALID_ORG_STATUSES:
-            result = build_problem(status, "BAD VALUE",
+            problem = build_problem(status, "BAD VALUE",
                                    "Not one of the allowed values")
-            org_results["status"] = result
+            org_problems["status"] = problem
     else:
-        org_results["status"] = build_missing_value_problem()
+        org_problems["status"] = build_missing_value_problem()
 
 
     if "established" in org:
         established = org["established"]
         if not isinstance(established, int):
-            result = build_problem(established, "BAD VALUE",
+            problem = build_problem(established, "BAD VALUE",
                                    "The value is not a number")
-            org_results["established"] = result
+            org_problems["established"] = problem
         elif not is_established_year_ok(org["id"], established):
-            result = build_problem(established, "BAD VALUE",
+            problem = build_problem(established, "BAD VALUE",
                                    "Year is not (ikely) to be correct")
-            org_results["established"] = result
+            org_problems["established"] = problem
     else:
-        org_results["established"] = build_missing_value_problem()
+        org_problems["established"] = build_missing_value_problem()
 
 
     if "relationships" in org:
@@ -302,27 +300,27 @@ def validate_org(org_results, org):
             label = "relationships[%d]" % i
             type = relationship["type"]
             if not type in VALID_ORG_RELATIONSHIP_TYPES:
-                append_problem(org_results, label, type, "BAD VALUE",
+                append_problem(org_problems, label, type, "BAD VALUE",
                               "Relationship type is not one of the allowed value")
             # TODO add checks that label and id are valid.
             i += 1
     else:
-        org_results["relationships"] = build_missing_value_problem()
+        org_problems["relationships"] = build_missing_value_problem()
 
 
 def validate_json(data):
     global futures_not_done
     if not args.offline:
         logging.info("Scheduling URL checks for %d organisations.", len(data))
-    results = {}
+    problems = {}
     try:
         completed_checks_count=0
         for org in data:
             id = org["id"]
-            org_results = {}
-            results[id] = org_results
-            validate_urls(org_results, org)
-            validate_org(org_results, org)
+            org_problems = {}
+            problems[id] = org_problems
+            validate_urls(org_problems, org)
+            validate_org(org_problems, org)
 
         logging.info("%d URL checks have been queued.", len(futures_not_done))
         while True:
@@ -331,8 +329,8 @@ def validate_json(data):
                 break
             completed_checks_count += len(done)
             total_checks = completed_checks_count + len(futures_not_done)
-            print_progress(total_checks, completed_checks_count, results)
-        return results;
+            print_progress(total_checks, completed_checks_count)
+        return problems;
 
     except KeyboardInterrupt as e:
         logging.warning("Shutting down...")
@@ -342,20 +340,20 @@ def validate_json(data):
         total_checks = completed_checks_count + len(futures_not_done)
         logging.info("Interrupted when %d%% URL checks have completed.",
                      100.0*(total_checks-len(futures_not_done))/total_checks)
-        return results;
+        return problems;
 
 
-def post_process_results(results):
-    new_results = {}
-    for key, value in results.items():
+def post_process_problems(problems):
+    filtered_problems = {}
+    for key, value in problems.items():
         if bool(value):
-            new_results[key] = value
-    return new_results
+            filtered_problems[key] = value
+    return filtered_problems
 
 
-def show_results(results):
+def save_problems(problems):
     with open(args.o, 'w') as out:
-        json.dump(results, out, indent=4)
+        json.dump(problems, out, indent=4)
 
 
 parser = argparse.ArgumentParser(description='Verify a ROR data-dump.')
@@ -385,6 +383,6 @@ executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency)
 session = FuturesSession(executor=executor)
 
 data = load_json(args.data)
-results = validate_json(data)
-results2 = post_process_results(results)
-show_results(results2)
+raw_problems = validate_json(data)
+problems = post_process_problems(raw_problems)
+save_problems(problems)
