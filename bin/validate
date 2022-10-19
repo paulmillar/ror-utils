@@ -95,6 +95,15 @@ def redirection(response):
     return None
 
 
+def build_missing_value_problem(**extra):
+    result = {}
+    result["problem_class"] = "MISSING VALUE"
+    result["description"] = "A required value is missing"
+    for k,v in extra.items():
+        result[k] = v
+    return result
+
+
 def build_problem(value, problem_class, description, **extra):
     result = {}
     result["value"] = value
@@ -252,20 +261,28 @@ def is_established_year_ok(id, year):
 
 
 def validate_org(org_results, org):
-    i = 1
-    for type in org["types"]:
-        if not type in VALID_ORG_TYPES:
-            label = "types[%d]" % i
-            result = build_problem(type, "BAD VALUE",
-                                   "Org type is not one of the allowed value")
-            org_results[label] = result
-        i += 1
+    if "types" in org:
+        i = 1
+        for type in org["types"]:
+            if not type in VALID_ORG_TYPES:
+                label = "types[%d]" % i
+                result = build_problem(type, "BAD VALUE",
+                                       "Not one of the allowed values")
+                org_results[label] = result
+            i += 1
+    else:
+        org_results["types"] = build_missing_value_problem()
 
-    status = org["status"]
-    if not status in VALID_ORG_STATUSES:
-        result = build_problem(status, "BAD VALUE",
-                              "Not one of the allowed value")
-        org_results["status"] = result
+
+    if "status" in org:
+        status = org["status"]
+        if not status in VALID_ORG_STATUSES:
+            result = build_problem(status, "BAD VALUE",
+                                   "Not one of the allowed values")
+            org_results["status"] = result
+    else:
+        org_results["status"] = build_missing_value_problem()
+
 
     if "established" in org:
         established = org["established"]
@@ -277,6 +294,9 @@ def validate_org(org_results, org):
             result = build_problem(established, "BAD VALUE",
                                    "Year is not (ikely) to be correct")
             org_results["established"] = result
+    else:
+        org_results["established"] = build_missing_value_problem()
+
 
     if "relationships" in org:
         i = 1
@@ -288,6 +308,8 @@ def validate_org(org_results, org):
                               "Relationship type is not one of the allowed value")
             # TODO add checks that label and id are valid.
             i += 1
+    else:
+        org_results["relationships"] = build_missing_value_problem()
 
 
 def validate_json(data):
