@@ -95,18 +95,18 @@ def redirection(response):
     return None
 
 
-def build_result(value, problem, description, **extra):
+def build_problem(value, problem_class, description, **extra):
     result = {}
     result["value"] = value
-    result["problem_class"] = problem
+    result["problem_class"] = problem_class
     result["description"] = description
     for k,v in extra.items():
         result[k] = v
     return result
 
 
-def append_url_result(org_results, label, value, problem, description, **extra):
-    result = build_result(value, problem, description, **extra)
+def append_problem(org_results, label, value, problem_class, description, **extra):
+    result = build_problem(value, problem_class, description, **extra)
     if not label in org_results:
         org_results[label] = []
     org_results[label].append(result)
@@ -123,10 +123,10 @@ def check_result(future):
             redirect = redirection(r)
 
             if redirect:
-                append_url_result(results, label, r.url,
-                                  "REDIRECTION",
-                                  "Server's reply indicates the URL is out-of-date and provided an updated URL",
-                                  updated_url=redirect)
+                append_problem(results, label, r.url,
+                               "REDIRECTION",
+                               "Server's reply indicates the URL is out-of-date and provided an updated URL",
+                               updated_url=redirect)
 
                 # FIXME: The following start_head_req call doesn't work
                 #        for unknown reasons.
@@ -136,29 +136,29 @@ def check_result(future):
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
                 # REVISIT: do we want to be more specific here?  For example, mapping
                 # a 404 status code to a distinct problem class?
-                append_url_result(results, label, r.url,
-                                  "HTTP",
-                                  "Web-server's reply indicates a problem: %d %s"
-                                  % (r.status_code, r.reason))
+                append_problem(results, label, r.url,
+                               "HTTP",
+                               "Web-server's reply indicates a problem: %d %s"
+                               % (r.status_code, r.reason))
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
-            append_url_result(results, label, ce.request.url,
-                              "CONNECTION",
-                              "Problem connecting to web-server: " + str(ce))
+            append_problem(results, label, ce.request.url,
+                           "CONNECTION",
+                           "Problem connecting to web-server: " + str(ce))
         except requests.exceptions.Timeout as t:
-            append_url_result(results, label, t.request.url,
-                              "TIMEOUT",
-                              "Web-server took too long to reply: " + str(t))
+            append_problem(results, label, t.request.url,
+                           "TIMEOUT",
+                           "Web-server took too long to reply: " + str(t))
         except requests.exceptions.RequestException as re:
             logging.debug("%s %s", re.request.url, re)
-            append_url_result(results, label, re.request.url,
-                              "GENERIC",
-                              "Something went wrong when contacting the web-server: " + str(re))
+            append_problem(results, label, re.request.url,
+                           "GENERIC",
+                           "Something went wrong when contacting the web-server: " + str(re))
     else:
         logging.warning("Weird future state %s", future)
-        append_url_result(results, label, r.url,
-                          "INTERNAL",
-                          "Weird future: " + str(future))
+        append_problem(results, label, r.url,
+                       "INTERNAL",
+                       "Weird future: " + str(future))
 
 
 def start_head_req(results, label, url):
@@ -183,7 +183,7 @@ def validate_url(results, label, url):
             start_head_req(results, label, url)
     else:
         logging.debug("Invalid URL \"%s\"", url)
-        append_url_result(results, label, url, "BAD VALUE",
+        append_problem(results, label, url, "BAD VALUE",
                           "The value is not a valid URL.")
 
 
@@ -239,26 +239,26 @@ def validate_org(org_results, org):
     for type in org["types"]:
         if not type in VALID_ORG_TYPES:
             label = "types[%d]" % i
-            result = build_result(type, "BAD VALUE",
-                                  "Org type is not one of the allowed value")
+            result = build_problem(type, "BAD VALUE",
+                                   "Org type is not one of the allowed value")
             org_results[label] = result
         i += 1
 
     status = org["status"]
     if not status in VALID_ORG_STATUSES:
-        result = build_result(status, "BAD VALUE",
+        result = build_problem(status, "BAD VALUE",
                               "Not one of the allowed value")
         org_results["status"] = result
 
     if "established" in org:
         established = org["established"]
         if not isinstance(established, int):
-            result = build_result(established, "BAD VALUE",
-                                  "The value is not a number")
+            result = build_problem(established, "BAD VALUE",
+                                   "The value is not a number")
             org_results["established"] = result
         elif not is_established_year_ok(org["id"], established):
-            result = build_result(established, "BAD VALUE",
-                                  "Year is not (ikely) to be correct")
+            result = build_problem(established, "BAD VALUE",
+                                   "Year is not (ikely) to be correct")
             org_results["established"] = result
 
     if "relationships" in org:
@@ -267,7 +267,7 @@ def validate_org(org_results, org):
             label = "relationships[%d]" % i
             type = relationship["type"]
             if not type in VALID_ORG_RELATIONSHIP_TYPES:
-                append_url_result(org_results, label, type, "BAD VALUE",
+                append_problem(org_results, label, type, "BAD VALUE",
                               "Relationship type is not one of the allowed value")
             # TODO add checks that label and id are valid.
             i += 1
