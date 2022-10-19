@@ -314,7 +314,8 @@ def validate_org(org_results, org):
 
 def validate_json(data):
     global futures_not_done
-    logging.info("Scheduling URL checks for %d organisations.", len(data))
+    if not args.offline:
+        logging.info("Scheduling URL checks for %d organisations.", len(data))
     results = {}
     try:
         completed_checks_count=0
