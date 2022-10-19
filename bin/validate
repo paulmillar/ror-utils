@@ -183,8 +183,8 @@ def validate_url(results, label, url):
             start_head_req(results, label, url)
     else:
         logging.debug("Invalid URL \"%s\"", url)
-        append_url_result(results, label, url, "BAD URL",
-                          "The text is not a valid URL.")
+        append_url_result(results, label, url, "BAD VALUE",
+                          "The value is not a valid URL.")
 
 
 def validate_urls(org):
@@ -254,7 +254,7 @@ def validate_org(org_results, org):
         established = org["established"]
         if not isinstance(established, int):
             result = build_result(established, "BAD VALUE",
-                                  "Value is not a number")
+                                  "The value is not a number")
             org_results["established"] = result
         elif not is_established_year_ok(org["id"], established):
             result = build_result(established, "BAD VALUE",
