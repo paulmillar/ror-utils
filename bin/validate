@@ -256,7 +256,7 @@ def is_established_year_ok(id, year):
     return year >= 1000
 
 
-def validate_org(org_problems, org):
+def validate_org(org_problems, org, name_by_id):
     if "types" in org:
         i = 1
         for type in org["types"]:
@@ -297,12 +297,21 @@ def validate_org(org_problems, org):
     if "relationships" in org:
         i = 1
         for relationship in org["relationships"]:
-            label = "relationships[%d]" % i
             type = relationship["type"]
             if not type in VALID_ORG_RELATIONSHIP_TYPES:
-                append_problem(org_problems, label, type, "BAD VALUE",
-                              "Relationship type is not one of the allowed value")
-            # TODO add checks that label and id are valid.
+                append_problem(org_problems, "relationships[%d].type" % i,
+                               type, "BAD VALUE",
+                              "Not one of the allowed values")
+            label = relationship["label"]
+            id = relationship["id"]
+            if not id in name_by_id:
+                problem = build_problem(id, "BAD VALUE",
+                                        "No corresponding organisation entry")
+                org_problems["relationships[%d].id" % i] = problem
+            elif name_by_id[id] != label:
+                problem = build_problem(label, "BAD VALUE",
+                                        "Does not match corresponding organisation name.")
+                org_problems["relationships[%d].label" % i] = problem
             i += 1
     else:
         org_problems["relationships"] = build_missing_value_problem()
@@ -312,6 +321,13 @@ def validate_json(data):
     global futures_not_done
     if not args.offline:
         logging.info("Scheduling URL checks for %d organisations.", len(data))
+
+    name_by_id = {}
+    for org in data:
+        id = org["id"]
+        name = org["name"]
+        name_by_id[id] = name
+
     problems = {}
     try:
         completed_checks_count=0
@@ -320,7 +336,7 @@ def validate_json(data):
             org_problems = {}
             problems[id] = org_problems
             validate_urls(org_problems, org)
-            validate_org(org_problems, org)
+            validate_org(org_problems, org, name_by_id)
 
         logging.info("%d URL checks have been queued.", len(futures_not_done))
         while True:
