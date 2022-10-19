@@ -13,6 +13,29 @@ import argparse
 import validators
 import logging
 
+# Controlled vocabularies.  The values are taken from:
+#
+# https://ror.readme.io/docs/ror-data-structure
+
+VALID_ORG_TYPES = ["Education",
+                   "Healthcare",
+                   "Company",
+                   "Archive",
+                   "Nonprofit",
+                   "Government",
+                   "Facility",
+                   "Other" ]
+
+VALID_ORG_STATUSES = [
+    "active", # Currently all entries have this value.
+    "Active",
+    "Inactive",
+    "Withdrawn" ]
+
+VALID_ORG_RELATIONSHIP_TYPES = [ "Related",
+                                 "Parent",
+                                 "Child" ]
+
 # Global list of pending URL-checking futures.
 futures_not_done = []
 
@@ -72,13 +95,18 @@ def redirection(response):
     return None
 
 
-def append_url_result(org_results, label, url, problem, description, **extra):
+def build_result(value, problem, description, **extra):
     result = {}
-    result["url"] = url
+    result["value"] = value
     result["problem_class"] = problem
     result["description"] = description
     for k,v in extra.items():
         result[k] = v
+    return result
+
+
+def append_url_result(org_results, label, value, problem, description, **extra):
+    result = build_result(value, problem, description, **extra)
     if not label in org_results:
         org_results[label] = []
     org_results[label].append(result)
@@ -192,6 +220,59 @@ def print_progress(total, done, results):
         problems = problems + len(org_results)
     logging.info("    %d (%d%%) URL checks (of %d) completed.  Of the URLs checked, %d (%d%%) have a problem.", done, 100.0*done/total, total, problems, 100.0*problems/done)
 
+
+def is_established_year_ok(id, year):
+    """Use heuristics to check whether a year is "likely"
+    """
+    # TODO: verify the following entries
+    #  ID                         YEAR
+    #  https://ror.org/05htk5m33  976
+    #  https://ror.org/05fnp1145  970
+    #
+    if id == "https://ror.org/021v42516": # if Glastonbury Abbey
+        return year == 712
+    return year >= 1000
+
+
+def validate_org(org_results, org):
+    i = 1
+    for type in org["types"]:
+        if not type in VALID_ORG_TYPES:
+            label = "types[%d]" % i
+            result = build_result(type, "BAD VALUE",
+                                  "Org type is not one of the allowed value")
+            org_results[label] = result
+        i += 1
+
+    status = org["status"]
+    if not status in VALID_ORG_STATUSES:
+        result = build_result(status, "BAD VALUE",
+                              "Not one of the allowed value")
+        org_results["status"] = result
+
+    if "established" in org:
+        established = org["established"]
+        if not isinstance(established, int):
+            result = build_result(established, "BAD VALUE",
+                                  "Value is not a number")
+            org_results["established"] = result
+        elif not is_established_year_ok(org["id"], established):
+            result = build_result(established, "BAD VALUE",
+                                  "Year is not (ikely) to be correct")
+            org_results["established"] = result
+
+    if "relationships" in org:
+        i = 1
+        for relationship in org["relationships"]:
+            label = "relationships[%d]" % i
+            type = relationship["type"]
+            if not type in VALID_ORG_RELATIONSHIP_TYPES:
+                append_url_result(org_results, label, type, "BAD VALUE",
+                              "Relationship type is not one of the allowed value")
+            # TODO add checks that label and id are valid.
+            i += 1
+
+
 def validate_json(data):
     global futures_not_done
     logging.info("Scheduling URL checks for %d organisations.", len(data))
@@ -202,6 +283,7 @@ def validate_json(data):
             org_results = validate_urls(org)
             id = org["id"]
             results[id] = org_results
+            validate_org(org_results, org)
 
         logging.info("%d URL checks have been queued.", len(futures_not_done))
         while True:
