@@ -134,13 +134,9 @@ def check_result(future):
             if redirect:
                 append_problem(problems, label, r.url,
                                "REDIRECTION",
-                               "Server's reply indicates the URL is out-of-date and provided an updated URL",
+                               "Server's replied URL is out-of-date and provided an updated URL; the updated URL will be checked.",
                                updated_url=redirect)
-
-                # FIXME: The following start_head_req call doesn't work
-                #        for unknown reasons.
-                #
-                #start_head_req(problems, label, redirect)
+                start_head_req(problems, label, redirect)
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
 
@@ -240,7 +236,7 @@ def urls_to_verify(org):
 
 
 def print_progress(total, done):
-    logging.info("    %d (%d%%) URL checks (of %d) completed.",
+    logging.info("    %d (%d%%) URL checks completed, of %d total checks.",
                  done, 100.0*done/total, total)
 
 
@@ -317,6 +313,14 @@ def validate_org(org_problems, org, name_by_id):
         org_problems["relationships"] = build_missing_value_problem()
 
 
+def update_progress(timeout):
+    global futures_not_done
+    wait_for = futures_not_done.copy()
+    (done,ignored) = concurrent.futures.wait(wait_for, timeout=timeout)
+    futures_not_done = [f for f in futures_not_done if f not in done]
+    return len(done)
+
+
 def validate_json(data):
     global futures_not_done
     if not args.offline:
@@ -340,20 +344,20 @@ def validate_json(data):
 
         logging.info("%d URL checks have been queued.", len(futures_not_done))
         while True:
-            (done, futures_not_done) = concurrent.futures.wait(futures_not_done, timeout=2)
+            done_count = update_progress(2)
             if len(futures_not_done) == 0:
                 break
-            completed_checks_count += len(done)
+            completed_checks_count += done_count
             total_checks = completed_checks_count + len(futures_not_done)
             print_progress(total_checks, completed_checks_count)
         return problems;
 
     except KeyboardInterrupt as e:
         logging.warning("Shutting down...")
-        (done, futures_not_done) = concurrent.futures.wait(futures_not_done, timeout=0)
-        executor.shutdown(wait=True, cancel_futures=True)
-        completed_checks_count += len(done)
+        done_count = update_progress(0)
+        completed_checks_count += done_count
         total_checks = completed_checks_count + len(futures_not_done)
+        executor.shutdown(wait=True, cancel_futures=True)
         logging.info("Interrupted when %d%% URL checks have completed.",
                      100.0*(total_checks-len(futures_not_done))/total_checks)
         return problems;
