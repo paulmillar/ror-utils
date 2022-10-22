@@ -74,6 +74,21 @@ def redirection(response):
     if not response.is_redirect:
         return None
 
+    #  The 'Expires' header indicates the redirection is time-limited.
+    #  The 'Cache-Control' header (depending on the value) may also
+    #  result in the redirection being time-limted.
+    #
+    #  Normally, including an expiry date would be an indication that
+    #  an entry's link should NOT be updated.  However, it seems to be
+    #  common practice to include an expiry date, even for permanent
+    #  redirection and for simple http-->https scheme-only
+    #  redirection.  Speculating, this may be to provide a way to
+    #  recover from a misconfigured server that redirects to the wrong
+    #  URL.
+    #
+    #  Therefore, we must ignore the the Expires and Cache-Control
+    #  headers.
+
     location_header = response.headers['location']
     location = urljoin(response.url, location_header)
 
