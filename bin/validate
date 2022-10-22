@@ -9,6 +9,7 @@ import concurrent.futures
 import sys
 from requests_futures.sessions import FuturesSession
 from urllib.parse import urljoin
+from urllib3.exceptions import MaxRetryError
 import argparse
 import validators
 import logging
@@ -187,9 +188,12 @@ def check_result(future):
                                "Link is good.")
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
+            cause = ce.__context__
+            if type(cause) is MaxRetryError:
+                cause = cause.reason
             append_problem(problems, label, ce.request.url,
                            "CONNECTION",
-                           "Problem connecting to web-server: " + str(ce))
+                           "Problem connecting to web-server: " + str(cause))
         except requests.exceptions.Timeout as t:
             append_problem(problems, label, t.request.url,
                            "TIMEOUT",
