@@ -125,7 +125,8 @@ def build_missing_value_problem(**extra):
 def build_problem(value, problem_class, description, **extra):
     problem = {}
     problem["value"] = value
-    problem["problem_class"] = problem_class
+    if problem_class:
+        problem["problem_class"] = problem_class
     problem["description"] = description
     for k,v in extra.items():
         problem[k] = v
@@ -144,6 +145,7 @@ def check_result(future):
         return
     problems = future.problems
     label = future.label
+    log_success = future.log_success
     if future.done():
         try:
             r = future.result()
@@ -154,7 +156,7 @@ def check_result(future):
                                "REDIRECTION",
                                "Server returned a preferred URL.  Scheduling a check for this URL.",
                                preferred_url=redirect)
-                start_head_req(problems, label, redirect)
+                start_head_req(problems, label, redirect, log_success=True)
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
 
@@ -180,6 +182,9 @@ def check_result(future):
                                    "HTTP",
                                    "Web-server indicated a problem: %d %s"
                                    % (r.status_code, r.reason))
+            elif log_success:
+                append_problem(problems, label, r.url, None,
+                               "Link is good.")
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
             append_problem(problems, label, ce.request.url,
@@ -201,11 +206,12 @@ def check_result(future):
                        "Weird future: " + str(future))
 
 
-def start_head_req(problems, label, url):
+def start_head_req(problems, label, url, log_success=False):
     global futures_not_done
     future = session.head(url, timeout=args.timeout)
     future.label = label
     future.problems = problems
+    future.log_success = log_success
     future.add_done_callback(check_result)
     futures_not_done.append(future)
 
