@@ -41,7 +41,10 @@ futures_not_done = []
 
 
 def is_scheme_only_redirect(before_url, after_url):
-    """Check whether a redirection involves changing only the scheme.
+    """Check whether a redirection involves changing only the scheme.  For
+    example, a redirection from "http://example.org/page1.html" to
+    "https://example.org/page1.html" is a scheme-only redirection.
+
     """
 
     before = before_url.split(':',1)
