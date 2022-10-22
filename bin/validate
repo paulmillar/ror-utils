@@ -134,8 +134,8 @@ def check_result(future):
             if redirect:
                 append_problem(problems, label, r.url,
                                "REDIRECTION",
-                               "Server's replied URL is out-of-date and provided an updated URL; the updated URL will be checked.",
-                               updated_url=redirect)
+                               "Server returned a preferred URL.  Scheduling a check for this URL.",
+                               preferred_url=redirect)
                 start_head_req(problems, label, redirect)
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
