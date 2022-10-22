@@ -9,7 +9,7 @@ import concurrent.futures
 import sys
 from requests_futures.sessions import FuturesSession
 from urllib.parse import urljoin
-from urllib3.exceptions import MaxRetryError
+from urllib3.exceptions import (MaxRetryError, SSLError)
 import argparse
 import validators
 import logging
@@ -191,9 +191,13 @@ def check_result(future):
             cause = ce.__context__
             if type(cause) is MaxRetryError:
                 cause = cause.reason
+            if type(cause) is SSLError:
+                description = "TLS-related problem connecting to web-server: " + str(cause)
+                # TODO reschedule with security turned off.
+            else:
+                description = "Problem connecting to web-server: " + str(cause)
             append_problem(problems, label, ce.request.url,
-                           "CONNECTION",
-                           "Problem connecting to web-server: " + str(cause))
+                           "CONNECTION", description)
         except requests.exceptions.Timeout as t:
             append_problem(problems, label, t.request.url,
                            "TIMEOUT",
