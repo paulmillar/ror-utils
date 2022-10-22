@@ -147,6 +147,7 @@ def check_result(future):
     problems = future.problems
     label = future.label
     log_success = future.log_success
+    verify = future.verify
     if future.done():
         try:
             r = future.result()
@@ -157,7 +158,8 @@ def check_result(future):
                                "REDIRECTION",
                                "Server returned a preferred URL.  Scheduling a check for this URL.",
                                preferred_url=redirect)
-                start_head_req(problems, label, redirect, log_success=True)
+                start_head_req(problems, label, redirect,
+                               log_success="Link is good.")
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
 
@@ -185,7 +187,7 @@ def check_result(future):
                                    % (r.status_code, r.reason))
             elif log_success:
                 append_problem(problems, label, r.url, None,
-                               "Link is good.")
+                               log_success)
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
             cause = ce.__context__
@@ -193,7 +195,10 @@ def check_result(future):
                 cause = cause.reason
             if type(cause) is SSLError:
                 description = "TLS-related problem connecting to web-server: " + str(cause)
-                # TODO reschedule with security turned off.
+                if verify:
+                    description = description + "; rescheduling check with certificate verification switched off"
+                    start_head_req(problems, label, ce.request.url,
+                                   verify=False, log_success="Link worked, but only with cert. verification switched off.  Link is BAD.")
             else:
                 description = "Problem connecting to web-server: " + str(cause)
             append_problem(problems, label, ce.request.url,
@@ -214,12 +219,14 @@ def check_result(future):
                        "Weird future: " + str(future))
 
 
-def start_head_req(problems, label, url, log_success=False):
+def start_head_req(problems, label, url, log_success=None,
+                   verify=True):
     global futures_not_done
-    future = session.head(url, timeout=args.timeout)
+    future = session.head(url, timeout=args.timeout, verify=verify)
     future.label = label
     future.problems = problems
     future.log_success = log_success
+    future.verify = verify
     future.add_done_callback(check_result)
     futures_not_done.append(future)
 
