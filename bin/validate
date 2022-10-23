@@ -141,6 +141,27 @@ def append_problem(org_problems, label, value, problem_class, description, **ext
     org_problems[label].append(problem)
 
 
+def without_parentheses(text):
+    if text[0] == '(' and text[-1] == ')':
+        return text[1:-1]
+    else:
+        return text
+
+
+def without_quotes(text):
+    if text[0] == '"' and text[-1] == '"':
+        return text[1:-1]
+    else:
+        return text
+
+
+def without_trailing(text, char):
+    if text[-1] == char:
+        return text[0:-1]
+    else:
+        return text
+
+
 def check_result(future):
     if future.cancelled():
         return
@@ -156,7 +177,7 @@ def check_result(future):
             if redirect:
                 append_problem(problems, label, r.url,
                                "REDIRECTION",
-                               "Server returned a preferred URL.  Scheduling a check for this URL.",
+                               "Server returned a preferred URL.  Scheduling a check for this new URL.",
                                preferred_url=redirect)
                 start_head_req(problems, label, redirect,
                                log_success="Link is good.")
@@ -194,13 +215,15 @@ def check_result(future):
             if type(cause) is MaxRetryError:
                 cause = cause.reason
             if type(cause) is SSLError:
-                description = "TLS-related problem connecting to web-server: " + str(cause)
+                tls_problem = without_quotes(without_trailing(without_parentheses(str(cause)), ","))
+                description = "TLS-related problem connecting to web-server: " + tls_problem
                 if verify:
-                    description = description + "; rescheduling check with certificate verification switched off"
+                    description = description + ".  Scheduling a new check with certificate verification switched off.  This is ONLY to see if the server redirects to a valid URL."
                     start_head_req(problems, label, ce.request.url,
-                                   verify=False, log_success="Link worked, but only with cert. verification switched off.  Link is BAD.")
+                                   verify=False, log_success="The server DID NOT redirect to a new URL.  This URL is BAD and SHOULD NOT be used.")
             else:
-                description = "Problem connecting to web-server: " + str(cause)
+                connection_problem = without_parentheses(str(cause))
+                description = "Problem connecting to web-server: " + connection_problem
             append_problem(problems, label, ce.request.url,
                            "CONNECTION", description)
         except requests.exceptions.Timeout as t:
