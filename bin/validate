@@ -435,6 +435,7 @@ args = parser.parse_args()
 
 logging.getLogger().setLevel(logging.DEBUG if args.debug else logging.INFO)
 logging.getLogger('urllib3').setLevel(logging.INFO)
+logging.getLogger('urllib3.connection').setLevel(logging.ERROR)
 
 concurrency = args.concurrency
 logging.info("Running %d HTTP requests in parallel.", concurrency)
