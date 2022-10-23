@@ -206,9 +206,18 @@ def check_result(future):
                                    "HTTP",
                                    "Web-server indicated a problem: %d %s"
                                    % (r.status_code, r.reason))
-            elif log_success:
-                append_problem(problems, label, r.url, None,
-                               log_success)
+            else:
+                if not verify:
+                    # TODO: we tried switching off certificate
+                    # verification, to allow the server to reply with
+                    # a redirect.  The server did not redirect, but
+                    # replied 200.  As a "Hail Mary" work-around,
+                    # schedule a test with 'www.' from the FQDN, if
+                    # the hostname has this prefix.
+                    pass
+                if log_success:
+                    append_problem(problems, label, r.url, None,
+                                   log_success)
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
             cause = ce.__context__
