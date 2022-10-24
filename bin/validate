@@ -8,7 +8,7 @@ import requests
 import concurrent.futures
 import sys
 from requests_futures.sessions import FuturesSession
-from urllib.parse import urljoin
+from urllib.parse import (urljoin, urlparse)
 from urllib3.exceptions import (MaxRetryError, SSLError)
 import argparse
 import validators
@@ -40,6 +40,22 @@ VALID_ORG_RELATIONSHIP_TYPES = [ "Related",
 # Global list of pending URL-checking futures.
 futures_not_done = []
 
+def default_port(scheme):
+    return "80" if scheme == "http" else "443"
+
+
+def canonical_url(url):
+    parsed = urlparse(url)
+    if not parsed.port:
+        new_netloc = parsed.netloc + ":" + default_port(parsed.scheme)
+        parsed = parsed._replace(netloc=new_netloc)
+    return parsed
+
+
+def switch_scheme(url, new_scheme):
+    new_netloc = url.netloc.split(":")[0] + ":" + default_port(new_scheme)
+    return url._replace(scheme = new_scheme, netloc = new_netloc)
+
 
 def is_scheme_only_redirect(before_url, after_url):
     """Check whether a redirection involves changing only the scheme.  For
@@ -48,15 +64,9 @@ def is_scheme_only_redirect(before_url, after_url):
 
     """
 
-    before = before_url.split(':',1)
-    after = after_url.split(':',1)
-    if len(before) != 2:
-        logging.warning("Bad source URL: %s", before_url)
-        return False # REVISIT: or raise exception?
-    if len(after) != 2:
-        logging.warning("Bad redirection URL: %s", after_url)
-        return False # REVISIT: or raise exception?
-    return after[1] == before [1]
+    before = canonical_url(before_url)
+    after = canonical_url(after_url)
+    return switch_scheme(before, after.scheme) == after
 
 
 def redirection(response):
