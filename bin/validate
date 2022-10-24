@@ -172,6 +172,12 @@ def without_trailing(text, char):
         return text
 
 
+def strip_from_fqdn(url, prefix):
+    parsed = urlparse(url)
+    netloc = parsed.netloc
+    return parsed._replace(netloc=netloc[len(prefix):]).geturl() if netloc.startswith(prefix) else None
+
+
 def check_result(future):
     if future.cancelled():
         return
@@ -218,13 +224,37 @@ def check_result(future):
                                    % (r.status_code, r.reason))
             else:
                 if not verify:
-                    # TODO: we tried switching off certificate
-                    # verification, to allow the server to reply with
-                    # a redirect.  The server did not redirect, but
-                    # replied 200.  As a "Hail Mary" work-around,
-                    # schedule a test with 'www.' from the FQDN, if
-                    # the hostname has this prefix.
-                    pass
+                    #  To get here, the URL required switching off
+                    #  certificate verification, with the server
+                    #  responding with a 200 status code.
+                    #
+                    #  One possibility is that the certificate is
+                    #  valid but doesn't cover the FQDN used in the
+                    #  URL and the server hasn't been configured to
+                    #  redirect to the desired FQDN.
+                    #
+                    #  As a "shot in the dark", if the URL has a FQDN
+                    #  starting "www." then try without this "www."
+                    #  prefix.  This is done by scheduling a test with
+                    #  this prefix removed; e.g., if the URL is
+                    #  "https://www.example.org" then try with
+                    #  "https://example.org".
+                    #
+                    #  REVISIT: a more general strategy would be to
+                    #  obtain the certificate from the server and
+                    #  extract all DNS-based SANs (subject alternative
+                    #  names).  Select those SANs that have the URL's
+                    #  FQDN is a subdomain.  Select the longest such
+                    #  SAN and rewrite the URL to match.
+                    new_url = strip_from_fqdn(r.url, "www.")
+                    if new_url:
+                        message = log_success + " Guessing " + new_url
+                        append_problem(problems, label, r.url, None,
+                                       message)
+                        start_head_req(problems, label, new_url,
+                                       log_success="Link is good.")
+                        return
+
                 if log_success:
                     append_problem(problems, label, r.url, None,
                                    log_success)
@@ -237,9 +267,9 @@ def check_result(future):
                 tls_problem = without_quotes(without_trailing(without_parentheses(str(cause)), ","))
                 description = "TLS-related problem connecting to web-server: " + tls_problem
                 if verify:
-                    description = description + ".  Scheduling a new check with certificate verification switched off.  This is ONLY to see if the server redirects to a valid URL."
+                    description = description + ".  Trying without certificate verification, to allow a redirect response."
                     start_head_req(problems, label, ce.request.url,
-                                   verify=False, log_success="The server DID NOT redirect to a new URL.  This URL is BAD and SHOULD NOT be used.")
+                                   verify=False, log_success="No redirect: this URL is BAD.")
             else:
                 connection_problem = without_parentheses(str(cause))
                 description = "Problem connecting to web-server: " + connection_problem
