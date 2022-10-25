@@ -43,6 +43,9 @@ futures_not_done = []
 # Whether the HTTP HEAD request result callback is active.
 callback_active = 0
 
+# Global loop detection
+loop_urls = {}
+
 
 def default_port(scheme):
     return "80" if scheme == "http" else "443"
@@ -182,6 +185,25 @@ def strip_from_fqdn(url, prefix):
     return parsed._replace(netloc=netloc[len(prefix):]).geturl() if netloc.startswith(prefix) else None
 
 
+def describe_connection_error(connection_error):
+    cause = connection_error.__context__
+    if type(cause) is MaxRetryError:
+        cause = cause.reason
+    if type(cause) is SSLError:
+        tls_problem = without_quotes(without_trailing(without_parentheses(str(cause)), ","))
+        return "TLS-related problem connecting to web-server: " + tls_problem
+    else:
+        connection_problem = without_parentheses(str(cause))
+        return "Problem connecting to web-server: " + connection_problem
+
+
+def is_certificate_problem(connection_error):
+    cause = connection_error.__context__
+    if type(cause) is MaxRetryError:
+        cause = cause.reason
+    return type(cause) is SSLError
+
+
 def check_result(future):
     global callback_active
     if future.cancelled():
@@ -190,6 +212,8 @@ def check_result(future):
     label = future.label
     log_success = future.log_success
     verify = future.verify
+    id = future.id
+    request_submitted = False
     if future.done():
         try:
             assert callback_active >= 0
@@ -202,8 +226,9 @@ def check_result(future):
                                "REDIRECTION",
                                "Server returned a preferred URL.  Scheduling a check for this new URL.",
                                preferred_url=redirect)
-                start_head_req(problems, label, redirect,
-                               log_success="Link is good.")
+                request_submitted = start_head_req(id, problems,
+                                                   label, redirect,
+                                                   log_success="Link is good.")
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
 
@@ -258,8 +283,11 @@ def check_result(future):
                         message = log_success + " Guessing " + new_url
                         append_problem(problems, label, r.url, None,
                                        message)
-                        start_head_req(problems, label, new_url,
-                                       log_success="Link is good.")
+
+                        request_submitted = start_head_req(id,
+                                                           problems, label,
+                                                           new_url,
+                                                           log_success="Link is good.")
                         return
 
                 if log_success:
@@ -267,21 +295,22 @@ def check_result(future):
                                    log_success)
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
-            cause = ce.__context__
-            if type(cause) is MaxRetryError:
-                cause = cause.reason
-            if type(cause) is SSLError:
-                tls_problem = without_quotes(without_trailing(without_parentheses(str(cause)), ","))
-                description = "TLS-related problem connecting to web-server: " + tls_problem
-                if verify:
-                    description = description + ".  Trying without certificate verification, to allow a redirect response."
-                    start_head_req(problems, label, ce.request.url,
-                                   verify=False, log_success="No redirect: this URL is BAD.")
-            else:
-                connection_problem = without_parentheses(str(cause))
-                description = "Problem connecting to web-server: " + connection_problem
+            description = describe_connection_error(ce)
+            retry_without_verify = verify and is_certificate_problem(ce)
+
+            if retry_without_verify:
+                description += ".  Check for redirection by retrying with certificate verification disabled."
+
             append_problem(problems, label, ce.request.url,
                            "CONNECTION", description)
+
+            if retry_without_verify:
+                request_submitted = start_head_req(id, problems,
+                                                   label,
+                                                   ce.request.url,
+                                                   verify=False,
+                                                   log_success="No redirect: this URL is BAD.")
+
         except requests.exceptions.Timeout as t:
             append_problem(problems, label, t.request.url,
                            "TIMEOUT",
@@ -293,6 +322,8 @@ def check_result(future):
                            "Something went wrong when contacting the web-server: " + str(re))
         finally:
             callback_active -= 1
+            if not request_submitted:
+                finished_with_label(id, label)
     else:
         logging.warning("Weird future state %s", future)
         append_problem(problems, label, r.url,
@@ -302,17 +333,60 @@ def check_result(future):
     assert callback_active >= 0
 
 
-def start_head_req(problems, label, url, log_success=None,
+def is_loop(id, label, url, verify):
+    global loop_urls
+
+    if not id in loop_urls:
+        loop_urls[id] = {}
+
+    org_loop_info = loop_urls[id]
+
+    if not label in org_loop_info:
+        org_loop_info[label] = []
+
+    label_loop_info = org_loop_info[label]
+
+    can_url = (url.rstrip("/") + "/") if url[-1] == "/" else url
+    head_request = ("V" if verify else "NV") + "-" + can_url
+
+    if head_request in label_loop_info:
+        return True
+
+    label_loop_info.append(head_request)
+    return False
+
+
+def finished_with_label(id, label):
+    global loop_urls
+    if not id in loop_urls:
+        return
+
+    org_loop_info = loop_urls[id]
+    if label in org_loop_info:
+        del org_loop_info[label]
+
+    if not org_loop_info:
+        del loop_urls[id]
+
+
+def start_head_req(id, problems, label, url, log_success=None,
                    verify=True):
     global futures_not_done
+    if is_loop(id, label, url, verify):
+        append_problem(problems, label, url, "LOOP",
+                       "Vetoing requesting this URL: we have already tested it.")
+        return False
+
     s = session if verify else insecure_session
     future = s.head(url, timeout=args.timeout)
     future.label = label
     future.problems = problems
     future.log_success = log_success
     future.verify = verify
+    future.id = id
     future.add_done_callback(check_result)
     futures_not_done.append(future)
+    return True
 
 
 def is_url_valid(url):
@@ -322,7 +396,7 @@ def is_url_valid(url):
     return result
 
 
-def validate_url(problems, label, url):
+def validate_url(id, problems, label, url):
     if not is_url_valid(url):
         logging.debug("Invalid URL \"%s\"", url)
         append_problem(problems, label, url, "BAD VALUE",
@@ -330,12 +404,12 @@ def validate_url(problems, label, url):
         return
 
     if not args.offline:
-        start_head_req(problems, label, url)
+        start_head_req(id, problems, label, url)
 
 
 def validate_urls(org_problems, org):
     for label, url in urls_to_verify(org):
-        validate_url(org_problems, label, url)
+        validate_url(org["id"], org_problems, label, url)
 
 
 def load_json(filename):
