@@ -305,7 +305,8 @@ def check_result(future):
 def start_head_req(problems, label, url, log_success=None,
                    verify=True):
     global futures_not_done
-    future = session.head(url, timeout=args.timeout, verify=verify)
+    s = session if verify else insecure_session
+    future = s.head(url, timeout=args.timeout)
     future.label = label
     future.problems = problems
     future.log_success = log_success
@@ -525,6 +526,8 @@ concurrency = args.concurrency
 logging.info("Running %d HTTP requests in parallel.", concurrency)
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency)
 session = FuturesSession(executor=executor)
+insecure_session = FuturesSession(executor=executor)
+insecure_session.verify = False
 
 data = load_json(args.data)
 raw_problems = validate_json(data)
