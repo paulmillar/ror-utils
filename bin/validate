@@ -40,6 +40,10 @@ VALID_ORG_RELATIONSHIP_TYPES = [ "Related",
 # Global list of pending URL-checking futures.
 futures_not_done = []
 
+# Whether the HTTP HEAD request result callback is active.
+callback_active = 0
+
+
 def default_port(scheme):
     return "80" if scheme == "http" else "443"
 
@@ -179,6 +183,7 @@ def strip_from_fqdn(url, prefix):
 
 
 def check_result(future):
+    global callback_active
     if future.cancelled():
         return
     problems = future.problems
@@ -187,6 +192,8 @@ def check_result(future):
     verify = future.verify
     if future.done():
         try:
+            assert callback_active >= 0
+            callback_active += 1
             r = future.result()
             redirect = redirection(r)
 
@@ -284,11 +291,15 @@ def check_result(future):
             append_problem(problems, label, re.request.url,
                            "GENERIC",
                            "Something went wrong when contacting the web-server: " + str(re))
+        finally:
+            callback_active -= 1
     else:
         logging.warning("Weird future state %s", future)
         append_problem(problems, label, r.url,
                        "INTERNAL",
                        "Weird future: " + str(future))
+
+    assert callback_active >= 0
 
 
 def start_head_req(problems, label, url, log_success=None,
@@ -456,7 +467,7 @@ def validate_json(data):
         logging.info("%d URL checks have been queued.", len(futures_not_done))
         while True:
             done_count = update_progress(2)
-            if len(futures_not_done) == 0:
+            if len(futures_not_done) == 0 and callback_active == 0:
                 break
             completed_checks_count += done_count
             total_checks = completed_checks_count + len(futures_not_done)
