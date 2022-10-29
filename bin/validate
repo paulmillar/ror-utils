@@ -185,10 +185,15 @@ def strip_from_fqdn(url, prefix):
     return parsed._replace(netloc=netloc[len(prefix):]).geturl() if netloc.startswith(prefix) else None
 
 
-def describe_connection_error(connection_error):
+def get_root_cause(connection_error):
     cause = connection_error.__context__
     if type(cause) is MaxRetryError:
         cause = cause.reason
+    return cause
+
+
+def describe_connection_error(connection_error):
+    cause = get_root_cause(connection_error)
     if type(cause) is SSLError:
         tls_problem = without_quotes(without_trailing(without_parentheses(str(cause)), ","))
         return "TLS-related problem connecting to web-server: " + tls_problem
@@ -197,16 +202,38 @@ def describe_connection_error(connection_error):
         return "Problem connecting to web-server: " + connection_problem
 
 
-def is_tls_problem(connection_error):
-    """Check whether this connection error is because of some problem
-    establishing the TLS connection.  If this returns True then
-    disabling TLS is expected to succeed.
+def is_certificate_problem(connection_error):
+    """Check whether this connection error is because of some problem with
+    the certificate; for example, untrusted CA, certificate has
+    expired, or the certificate SANs do not match the FQDN in the URL.
+    In effect, this function assesses whether disabling certificate
+    verification could result in the request succeeding.
+
     """
 
-    cause = connection_error.__context__
-    if type(cause) is MaxRetryError:
-        cause = cause.reason
-    return type(cause) is SSLError
+    cause = get_root_cause(connection_error)
+    if not type(cause) is SSLError:
+        return False
+
+    msg = str(cause)
+    return " doesn't match " in msg \
+        or "CERTIFICATE_VERIFY_FAILED" in msg
+
+
+
+def is_certificate_SAN_problem(connection_error):
+    """Check whether this connection error is because the certificate's
+    SANs do not match the FQDN in the URL.  In effect, this function
+    assesses whether modifying the FQDN in the URL could result in the
+    request succeeding.
+
+    """
+
+    cause = get_root_cause(connection_error)
+    if not type(cause) is SSLError:
+        return False
+
+    return " doesn't match " in str(cause)
 
 
 def check_result(future):
@@ -218,6 +245,7 @@ def check_result(future):
     log_success = future.log_success
     verify = future.verify
     id = future.id
+    try_alternative_fqdn = future.try_alternative_fqdn
     request_submitted = False
     if future.done():
         try:
@@ -260,7 +288,7 @@ def check_result(future):
                                    "Web-server indicated a problem: %d %s"
                                    % (r.status_code, r.reason))
             else:
-                if not verify:
+                if not verify and try_alternative_fqdn:
                     #  To get here, the URL required switching off
                     #  certificate verification, with the server
                     #  responding with a 200 status code.
@@ -301,7 +329,7 @@ def check_result(future):
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
             description = describe_connection_error(ce)
-            retry_without_verify = verify and is_tls_problem(ce)
+            retry_without_verify = verify and is_certificate_problem(ce)
 
             if retry_without_verify:
                 description += ".  Check for redirection by retrying with certificate verification disabled."
@@ -314,6 +342,7 @@ def check_result(future):
                                                    label,
                                                    ce.request.url,
                                                    verify=False,
+                                                   try_alternative_fqdn=is_certificate_SAN_problem(ce),
                                                    log_success="No redirect: this URL is BAD.")
 
         except requests.exceptions.Timeout as t:
@@ -375,6 +404,7 @@ def finished_with_label(id, label):
 
 
 def start_head_req(id, problems, label, url, log_success=None,
+                   try_alternative_fqdn=False,
                    verify=True):
     global futures_not_done
     if is_loop(id, label, url, verify):
@@ -389,6 +419,7 @@ def start_head_req(id, problems, label, url, log_success=None,
     future.log_success = log_success
     future.verify = verify
     future.id = id
+    future.try_alternative_fqdn = try_alternative_fqdn
     future.add_done_callback(check_result)
     futures_not_done.append(future)
     return True
