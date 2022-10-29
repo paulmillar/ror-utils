@@ -224,11 +224,11 @@ def check_result(future):
             if redirect:
                 append_problem(problems, label, r.url,
                                "REDIRECTION",
-                               "Server returned a preferred URL.  Scheduling a check for this new URL.",
+                               "Server returned a preferred URL.  Scheduling a check for this preferred URL.",
                                preferred_url=redirect)
                 request_submitted = start_head_req(id, problems,
                                                    label, redirect,
-                                                   log_success="Link is good.")
+                                                   log_success="URL is good.")
             elif not r.ok:
                 logging.debug("%s %d %s", r.url, r.status_code, r.reason)
 
