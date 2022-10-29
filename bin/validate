@@ -197,7 +197,12 @@ def describe_connection_error(connection_error):
         return "Problem connecting to web-server: " + connection_problem
 
 
-def is_certificate_problem(connection_error):
+def is_tls_problem(connection_error):
+    """Check whether this connection error is because of some problem
+    establishing the TLS connection.  If this returns True then
+    disabling TLS is expected to succeed.
+    """
+
     cause = connection_error.__context__
     if type(cause) is MaxRetryError:
         cause = cause.reason
@@ -296,7 +301,7 @@ def check_result(future):
         except requests.exceptions.ConnectionError as ce:
             logging.debug("%s %s", ce.request.url, ce)
             description = describe_connection_error(ce)
-            retry_without_verify = verify and is_certificate_problem(ce)
+            retry_without_verify = verify and is_tls_problem(ce)
 
             if retry_without_verify:
                 description += ".  Check for redirection by retrying with certificate verification disabled."
