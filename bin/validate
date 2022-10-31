@@ -46,6 +46,10 @@ callback_active = 0
 # Global loop detection
 loop_urls = {}
 
+# Feedback state
+prev_done = 0
+prev_total = 0
+
 
 def default_port(scheme):
     return "80" if scheme == "http" else "443"
@@ -468,9 +472,18 @@ def urls_to_verify(org):
     return urls
 
 
+def describe_delta(previous, current):
+    return (str(current) + " (+" + str(current - previous) + ")") if previous else str(current)
+
 def print_progress(total, done):
-    logging.info("    %d (%d%%) URL checks completed, of %d total checks.",
-                 done, 100.0*done/total, total)
+    global prev_done, prev_total
+    percent_done = 100.0*done/total
+    done_description = describe_delta(prev_done, done)
+    total_description = describe_delta(prev_total, total)
+    logging.info("    %s URL checks completed, %d%% of %s total checks.",
+                 done_description, percent_done, total_description)
+    prev_done = done
+    prev_total = total
 
 
 def is_established_year_ok(id, year):
