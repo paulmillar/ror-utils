@@ -423,7 +423,13 @@ def start_head_req(id, problems, label, url, log_success=None,
         return False
 
     s = session if verify else insecure_session
-    future = s.head(url, timeout=args.timeout)
+    try:
+        future = s.head(url, timeout=args.timeout)
+    except RuntimeError as e:
+        append_problem(problems, label, url, "INTERNAL",
+                       "Cannot check this URL: " + str(e))
+        return False
+
     future.label = label
     future.problems = problems
     future.log_success = log_success
