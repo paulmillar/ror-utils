@@ -82,7 +82,7 @@ def is_scheme_only_redirect(before_url, after_url):
     return switch_scheme(before, after.scheme) == after
 
 
-def redirection(response):
+def redirection(response, problems, label):
     """Use heuristics to establish whether the response to an HTTP HEAD
     request indicates that the URL should be updated. Returns the
     updated URL where appropriate, None otherwise.
@@ -124,7 +124,10 @@ def redirection(response):
         # redirection.
         if "session" in location.lower():
             if not "session" in response.url.lower():
-                logging.warning("Vetoing redirection %s --> %s: adds a session token", response.url, location)
+                append_problem(problems, label, response.url,
+                               "REDIRECTION",
+                               "Vetoing server's preferred URL: it adds a session token.",
+                               preferred_url=location_header)
                 return None
             if not is_scheme_only_redirect(response.url, location):
                 logging.info("Accepting redirection %s --> %s: existing session token", response.url, location)
@@ -133,6 +136,11 @@ def redirection(response):
     elif is_scheme_only_redirect(response.url, location):
         logging.debug("Promoting scheme-only redirection %s  -->  %s", response.url, location)
         return location
+    else:
+        append_problem(problems, label, response.url,
+                       "REDIRECTION",
+                       "Vetoing server's preferred URL: non-permanent redirection is more than scheme change.",
+                       preferred_url=location_header)
 
     return None
 
@@ -258,7 +266,7 @@ def check_result(future):
             assert callback_active >= 0
             callback_active += 1
             r = future.result()
-            redirect = redirection(r)
+            redirect = redirection(r, problems, label)
 
             if redirect:
                 append_problem(problems, label, r.url,
