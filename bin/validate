@@ -655,6 +655,7 @@ args = parser.parse_args()
 logging.getLogger().setLevel(logging.DEBUG if args.debug else logging.INFO)
 logging.getLogger('urllib3').setLevel(logging.INFO)
 logging.getLogger('urllib3.connection').setLevel(logging.ERROR)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
 requests.packages.urllib3.disable_warnings()
 
 concurrency = args.concurrency
