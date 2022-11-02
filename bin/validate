@@ -299,6 +299,14 @@ def check_result(future):
                                    "MISSING",
                                    "The server could not find this resource (might be a temporary problem).",
                                    **extra_args)
+                elif r.status_code == 406:
+                    accept_header = r.request.headers["accept"]
+                    if accept_header:
+                        extra_args["accept_header"] = accept_header
+                    append_problem(problems, label, r.url,
+                                   "FAILED CONTENT NEGOTIATION",
+                                   "The requested resource is capable of generating only content not acceptable according to the 'Accept' headers sent in the request",
+                                   **extra_args)
                 elif r.status_code == 410:
                     append_problem(problems, label, r.url,
                                    "MISSING",
