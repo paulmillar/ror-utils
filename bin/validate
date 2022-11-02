@@ -129,7 +129,7 @@ def redirection(response, problems, label):
                 append_problem(problems, label, response.url,
                                "REDIRECTION",
                                "Vetoing server's preferred URL: it adds a session token.",
-                               preferred_url=location_header)
+                               preferred_url=location)
                 return None
             if not is_scheme_only_redirect(response.url, location):
                 logging.info("Accepting redirection %s --> %s: existing session token", response.url, location)
@@ -142,7 +142,7 @@ def redirection(response, problems, label):
         append_problem(problems, label, response.url,
                        "REDIRECTION",
                        "Vetoing server's preferred URL: non-permanent redirection is more than scheme change.",
-                       preferred_url=location_header)
+                       preferred_url=location)
 
     return None
 
