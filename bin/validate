@@ -28,8 +28,10 @@ VALID_ORG_TYPES = ["Education",
                    "Facility",
                    "Other" ]
 
+# Currently all ror entries have the status 'active', although this is
+# not a valid value.  The correct value is 'Active'.
 VALID_ORG_STATUSES = [
-    "active", # Currently all entries have this value.
+    "active",
     "Active",
     "Inactive",
     "Withdrawn" ]
