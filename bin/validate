@@ -10,6 +10,7 @@ import sys
 from requests_futures.sessions import FuturesSession
 from urllib.parse import (urljoin, urlparse)
 from urllib3.exceptions import (MaxRetryError, SSLError)
+from http import cookiejar
 import argparse
 import validators
 import logging
@@ -50,9 +51,34 @@ callback_active = 0
 # Global loop detection
 loop_urls = {}
 
+# CookieJars for links being tested
+cookiejars = {}
+
 # Feedback state
 prev_done = 0
 prev_total = 0
+
+
+class BlockAll(cookiejar.CookiePolicy):
+    return_ok = set_ok = domain_return_ok = path_return_ok = lambda self, *args, **kwargs: False
+    netscape = True
+    rfc2965 = hide_cookie2 = False
+
+
+def get_cookiejar(id, label):
+    global cookiejars
+    key = id + label
+    if not key in cookiejars:
+        cookiejars[key] = cookiejar.CookieJar()
+    return cookiejars[key]
+
+
+def clear_cookiejar(id, label):
+    global cookiejars
+    key = id + label
+    if key in cookiejars:
+        jar = cookiejars.pop(key)
+        jar.clear()
 
 
 def default_port(scheme):
@@ -268,6 +294,9 @@ def check_result(future):
             assert callback_active >= 0
             callback_active += 1
             r = future.result()
+            jar = get_cookiejar(id, label)
+            requests.cookies.extract_cookies_to_jar(jar, r.request, r.raw)
+
             redirect = redirection(r, problems, label)
 
             if redirect:
@@ -399,7 +428,10 @@ def check_result(future):
             futures_done_count += 1
             futures_not_done_count -= 1
             if not request_submitted:
-                finished_with_label(id, label)
+                # We're finished with this (id,label)
+                clear_loop_history(id, label)
+                clear_cookiejar(id, label)
+
     else:
         futures_done_count += 1
         futures_not_done_count -= 1
@@ -434,7 +466,7 @@ def is_loop(id, label, url, verify):
     return False
 
 
-def finished_with_label(id, label):
+def clear_loop_history(id, label):
     global loop_urls
     if not id in loop_urls:
         return
@@ -455,10 +487,10 @@ def start_head_req(id, problems, label, url, log_success=None,
         append_problem(problems, label, url, "LOOP",
                        "Vetoing requesting this URL: we have already tested it.")
         return False
-
     s = session if verify else insecure_session
+    jar = get_cookiejar(id, label)
     try:
-        future = s.head(url, timeout=args.timeout)
+        future = s.head(url, timeout=args.timeout, cookies=jar)
     except RuntimeError as e:
         append_problem(problems, label, url, "INTERNAL",
                        "Cannot check this URL: " + str(e))
@@ -688,8 +720,10 @@ concurrency = args.concurrency
 logging.info("Running %d HTTP requests in parallel.", concurrency)
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency)
 session = FuturesSession(executor=executor)
+session.cookies.set_policy(BlockAll())
 insecure_session = FuturesSession(executor=executor)
 insecure_session.verify = False
+insecure_session.cookies.set_policy(BlockAll())
 
 data = load_json(args.data)
 raw_problems = validate_json(data)
