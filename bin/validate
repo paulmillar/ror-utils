@@ -414,6 +414,10 @@ def check_result(future):
                                                    try_alternative_fqdn=is_certificate_SAN_problem(ce),
                                                    log_success="No redirect: this URL is BAD.")
 
+        except requests.exceptions.InvalidURL as iu:
+            append_problem(problems, label, future.url,
+                           "BAD VALUE",
+                           str(iu))
         except requests.exceptions.Timeout as t:
             append_problem(problems, label, t.request.url,
                            "TIMEOUT",
@@ -496,6 +500,7 @@ def start_head_req(id, problems, label, url, log_success=None,
                        "Cannot check this URL: " + str(e))
         return False
 
+    future.url = url
     future.label = label
     future.problems = problems
     future.log_success = log_success
