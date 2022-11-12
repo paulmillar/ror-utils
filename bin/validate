@@ -289,160 +289,159 @@ def check_result(future):
     id = future.id
     try_alternative_fqdn = future.try_alternative_fqdn
     request_submitted = False
-    if future.done():
-        try:
-            assert callback_active >= 0
-            callback_active += 1
-            r = future.result()
-            jar = get_cookiejar(id, label)
-            requests.cookies.extract_cookies_to_jar(jar, r.request, r.raw)
 
-            redirect = redirection(r, problems, label)
+    try:
+        assert callback_active >= 0
+        callback_active += 1
 
-            if redirect:
+        if not future.done():
+            logging.warning("Weird future state %s", future)
+            append_problem(problems, label, r.url,
+                           "INTERNAL",
+                           "Weird future: " + str(future))
+            return
+
+        r = future.result()
+        jar = get_cookiejar(id, label)
+        requests.cookies.extract_cookies_to_jar(jar, r.request, r.raw)
+
+        redirect = redirection(r, problems, label)
+
+        if redirect:
+            append_problem(problems, label, r.url,
+                           "REDIRECTION",
+                           "Server returned a preferred URL.  Scheduling a check for this preferred URL.",
+                           preferred_url=redirect)
+            request_submitted = start_head_req(id, problems,
+                                               label, redirect,
+                                               log_success="URL is good.")
+        elif not r.ok:
+            logging.debug("%s %d %s", r.url, r.status_code, r.reason)
+            extra_args={"status_code": str(r.status_code)}
+            if r.reason:
+                extra_args["reason_phrase"] = r.reason
+
+            if r.status_code == 401:
                 append_problem(problems, label, r.url,
-                               "REDIRECTION",
-                               "Server returned a preferred URL.  Scheduling a check for this preferred URL.",
-                               preferred_url=redirect)
-                request_submitted = start_head_req(id, problems,
-                                                   label, redirect,
-                                                   log_success="URL is good.")
-            elif not r.ok:
-                logging.debug("%s %d %s", r.url, r.status_code, r.reason)
-                extra_args={"status_code": str(r.status_code)}
-                if r.reason:
-                    extra_args["reason_phrase"] = r.reason
-
-                if r.status_code == 401:
-                    append_problem(problems, label, r.url,
-                                   "PERMISSION",
-                                   "The server requires authentication to allow access to the resource.",
-                                   **extra_args)
-                if r.status_code == 403:
-                    append_problem(problems, label, r.url,
-                                   "PERMISSION",
-                                   "The server understood the request, but is refusing to authorize it.",
-                                   **extra_args)
-                elif r.status_code == 404:
-                    append_problem(problems, label, r.url,
-                                   "MISSING",
-                                   "The server could not find this resource (might be a temporary problem).",
-                                   **extra_args)
-                elif r.status_code == 406:
-                    accept_header = r.request.headers["accept"]
-                    if accept_header:
-                        extra_args["accept_header"] = accept_header
-                    append_problem(problems, label, r.url,
-                                   "FAILED CONTENT NEGOTIATION",
-                                   "The requested resource is capable of generating only content not acceptable according to the 'Accept' headers sent in the request",
-                                   **extra_args)
-                elif r.status_code == 410:
-                    append_problem(problems, label, r.url,
-                                   "MISSING",
-                                   "The server asserts this resource has been permanently removed.",
-                                   **extra_args)
-                elif r.status_code == 500:
-                    append_problem(problems, label, r.url,
-                                   "BAD SERVER",
-                                   "A generic error message, given when an unexpected condition was encountered and no more specific message is suitable.",
-                                   **extra_args)
-                elif r.status_code == 503:
-                    append_problem(problems, label, r.url,
-                                   "BAD SERVER",
-                                   "The server cannot handle the request (because it is overloaded or down for maintenance). Generally, this is a temporary state.",
-                                   **extra_args)
-                else:
-                    append_problem(problems, label, r.url,
-                                   "HTTP",
-                                   "Web-server indicated a problem",
-                                   **extra_args)
+                               "PERMISSION",
+                               "The server requires authentication to allow access to the resource.",
+                               **extra_args)
+            if r.status_code == 403:
+                append_problem(problems, label, r.url,
+                               "PERMISSION",
+                               "The server understood the request, but is refusing to authorize it.",
+                               **extra_args)
+            elif r.status_code == 404:
+                append_problem(problems, label, r.url,
+                               "MISSING",
+                               "The server could not find this resource (might be a temporary problem).",
+                               **extra_args)
+            elif r.status_code == 406:
+                accept_header = r.request.headers["accept"]
+                if accept_header:
+                    extra_args["accept_header"] = accept_header
+                append_problem(problems, label, r.url,
+                               "FAILED CONTENT NEGOTIATION",
+                               "The requested resource is capable of generating only content not acceptable according to the 'Accept' headers sent in the request",
+                               **extra_args)
+            elif r.status_code == 410:
+                append_problem(problems, label, r.url,
+                               "MISSING",
+                               "The server asserts this resource has been permanently removed.",
+                               **extra_args)
+            elif r.status_code == 500:
+                append_problem(problems, label, r.url,
+                               "BAD SERVER",
+                               "A generic error message, given when an unexpected condition was encountered and no more specific message is suitable.",
+                               **extra_args)
+            elif r.status_code == 503:
+                append_problem(problems, label, r.url,
+                               "BAD SERVER",
+                               "The server cannot handle the request (because it is overloaded or down for maintenance). Generally, this is a temporary state.",
+                               **extra_args)
             else:
-                if not verify and try_alternative_fqdn:
-                    #  To get here, the URL required switching off
-                    #  certificate verification, with the server
-                    #  responding with a 200 status code.
-                    #
-                    #  One possibility is that the certificate is
-                    #  valid but doesn't cover the FQDN used in the
-                    #  URL and the server hasn't been configured to
-                    #  redirect to the desired FQDN.
-                    #
-                    #  As a "shot in the dark", if the URL has a FQDN
-                    #  starting "www." then try without this "www."
-                    #  prefix.  This is done by scheduling a test with
-                    #  this prefix removed; e.g., if the URL is
-                    #  "https://www.example.org" then try with
-                    #  "https://example.org".
-                    #
-                    #  REVISIT: a more general strategy would be to
-                    #  obtain the certificate from the server and
-                    #  extract all DNS-based SANs (subject alternative
-                    #  names).  Select those SANs that have the URL's
-                    #  FQDN is a subdomain.  Select the longest such
-                    #  SAN and rewrite the URL to match.
-                    new_url = strip_from_fqdn(r.url, "www.")
-                    if new_url:
-                        message = log_success + " Guessing " + new_url
-                        append_problem(problems, label, r.url, None,
-                                       message)
-
-                        request_submitted = start_head_req(id,
-                                                           problems, label,
-                                                           new_url,
-                                                           log_success="Link is good.")
-                        return
-
-                if log_success:
+                append_problem(problems, label, r.url,
+                               "HTTP",
+                               "Web-server indicated a problem",
+                               **extra_args)
+        else:
+            if not verify and try_alternative_fqdn:
+                #  To get here, the URL required switching off
+                #  certificate verification, with the server
+                #  responding with a 200 status code.
+                #
+                #  One possibility is that the certificate is
+                #  valid but doesn't cover the FQDN used in the
+                #  URL and the server hasn't been configured to
+                #  redirect to the desired FQDN.
+                #
+                #  As a "shot in the dark", if the URL has a FQDN
+                #  starting "www." then try without this "www."
+                #  prefix.  This is done by scheduling a test with
+                #  this prefix removed; e.g., if the URL is
+                #  "https://www.example.org" then try with
+                #  "https://example.org".
+                #
+                #  REVISIT: a more general strategy would be to
+                #  obtain the certificate from the server and
+                #  extract all DNS-based SANs (subject alternative
+                #  names).  Select those SANs that have the URL's
+                #  FQDN is a subdomain.  Select the longest such
+                #  SAN and rewrite the URL to match.
+                new_url = strip_from_fqdn(r.url, "www.")
+                if new_url:
+                    message = log_success + " Guessing " + new_url
                     append_problem(problems, label, r.url, None,
-                                   log_success)
-        except requests.exceptions.ConnectionError as ce:
-            logging.debug("%s %s", ce.request.url, ce)
-            description = describe_connection_error(ce)
-            retry_without_verify = verify and is_certificate_problem(ce)
+                                   message)
 
-            if retry_without_verify:
-                description += ".  Check for redirection by retrying with certificate verification disabled."
+                    request_submitted = start_head_req(id, problems,
+                                                       label, new_url,
+                                                       log_success="Link is good.")
+                    return
 
-            append_problem(problems, label, ce.request.url,
-                           "CONNECTION", description)
+            if log_success:
+                append_problem(problems, label, r.url, None,
+                               log_success)
+    except requests.exceptions.ConnectionError as ce:
+        logging.debug("%s %s", ce.request.url, ce)
+        description = describe_connection_error(ce)
+        retry_without_verify = verify and is_certificate_problem(ce)
 
-            if retry_without_verify:
-                request_submitted = start_head_req(id, problems,
-                                                   label,
-                                                   ce.request.url,
-                                                   verify=False,
-                                                   try_alternative_fqdn=is_certificate_SAN_problem(ce),
-                                                   log_success="No redirect: this URL is BAD.")
+        if retry_without_verify:
+            description += ".  Check for redirection by retrying with certificate verification disabled."
 
-        except requests.exceptions.InvalidURL as iu:
-            append_problem(problems, label, future.url,
-                           "BAD VALUE",
-                           str(iu))
-        except requests.exceptions.Timeout as t:
-            append_problem(problems, label, t.request.url,
-                           "TIMEOUT",
-                           "Web-server took too long to reply: " + str(t))
-        except requests.exceptions.RequestException as re:
-            logging.debug("%s %s", re.request.url, re)
-            append_problem(problems, label, re.request.url,
-                           "GENERIC",
-                           "Something went wrong when contacting the web-server: " + str(re))
-        finally:
-            callback_active -= 1
-            futures_done_count += 1
-            futures_not_done_count -= 1
-            if not request_submitted:
-                # We're finished with this (id,label)
-                clear_loop_history(id, label)
-                clear_cookiejar(id, label)
+        append_problem(problems, label, ce.request.url,
+                       "CONNECTION", description)
 
-    else:
+        if retry_without_verify:
+            request_submitted = start_head_req(id, problems,
+                                               label,
+                                               ce.request.url,
+                                               verify=False,
+                                               try_alternative_fqdn=is_certificate_SAN_problem(ce),
+                                               log_success="No redirect: this URL is BAD.")
+
+    except requests.exceptions.InvalidURL as iu:
+        append_problem(problems, label, future.url,
+                       "BAD VALUE",
+                       str(iu))
+    except requests.exceptions.Timeout as t:
+        append_problem(problems, label, t.request.url,
+                       "TIMEOUT",
+                       "Web-server took too long to reply: " + str(t))
+    except requests.exceptions.RequestException as re:
+        logging.debug("%s %s", re.request.url, re)
+        append_problem(problems, label, re.request.url,
+                       "GENERIC",
+                       "Something went wrong when contacting the web-server: " + str(re))
+    finally:
+        callback_active -= 1
         futures_done_count += 1
         futures_not_done_count -= 1
-        logging.warning("Weird future state %s", future)
-        append_problem(problems, label, r.url,
-                       "INTERNAL",
-                       "Weird future: " + str(future))
+        if not request_submitted:
+            # We're finished with this (id,label)
+            clear_loop_history(id, label)
+            clear_cookiejar(id, label)
 
     assert callback_active >= 0
 
