@@ -446,6 +446,30 @@ def check_result(future):
     assert callback_active >= 0
 
 
+def cookie_label(cookie):
+    """Calculate a canonical string represention for a cookie"""
+    cookie_str = str(cookie.version)
+    cookie_str += cookie.name
+    cookie_str += str(cookie.value)
+    cookie_str += str(cookie.port)
+    cookie_str += cookie.path
+    return cookie_str
+
+
+def hash_cookiejar(id, label):
+    """Calculate a short value (a hash) that represents a cookiejar's
+    content"""
+    cookie_labels = []
+    for cookie in get_cookiejar(id, label):
+        label = cookie_label(cookie)
+        cookie_labels.append(label)
+
+    cookie_labels.sort()
+
+    jar_str = " ".join(cookie_labels)
+    return hex(hash(jar_str))
+
+
 def is_loop(id, label, url, verify):
     global loop_urls
 
@@ -459,8 +483,10 @@ def is_loop(id, label, url, verify):
 
     label_loop_info = org_loop_info[label]
 
+    cookies = hash_cookiejar(id, label)
     can_url = (url.rstrip("/") + "/") if url[-1] == "/" else url
-    head_request = ("V" if verify else "NV") + "-" + can_url
+    verify_str = "V" if verify else "NV"
+    head_request = verify_str + " " + can_url + " " + cookies
 
     if head_request in label_loop_info:
         return True
