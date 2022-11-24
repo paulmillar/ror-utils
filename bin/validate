@@ -29,17 +29,16 @@ VALID_ORG_TYPES = ["Education",
                    "Facility",
                    "Other" ]
 
-# Currently all ror entries have the status 'active', although this is
-# not a valid value.  The correct value is 'Active'.
 VALID_ORG_STATUSES = [
     "active",
-    "Active",
-    "Inactive",
-    "Withdrawn" ]
+    "inactive",
+    "withdrawn" ]
 
 VALID_ORG_RELATIONSHIP_TYPES = [ "Related",
                                  "Parent",
-                                 "Child" ]
+                                 "Child",
+                                 "Successor",
+                                 "Predecessor"]
 
 # Global list of pending URL-checking futures.
 futures_not_done_count = 0
