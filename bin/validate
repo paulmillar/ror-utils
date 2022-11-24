@@ -542,6 +542,13 @@ def start_head_req(id, problems, label, url, log_success=None,
 def is_url_valid(url):
     result = validators.url(url, public=True)
     if isinstance(result, validators.ValidationFailure):
+        # Work-around for bug #204
+        #     https://github.com/python-validators/validators/issues/204
+        parsed = urlparse(url)
+        if parsed.netloc[-1] == '.':
+            fqdn_without_dot = parsed.netloc[:-1]
+            url_without_dot = parsed._replace(netloc=fqdn_without_dot).geturl()
+            return is_url_valid(url_without_dot)
         return False
     return result
 
