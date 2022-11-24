@@ -284,6 +284,22 @@
     ]
   ];
 
+  rr:predicateObjectMap [
+    rr:predicate grid:hasPredecessor;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rml:reference "relationships[?(@.type==\"Predecessor\")].id"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate grid:hasSuccessor;
+    rr:objectMap [
+      rr:termType rr:IRI;
+      rml:reference "relationships[?(@.type==\"Successor\")].id"
+    ]
+  ];
+
   #
   # Links to web pages.
   #

@@ -25,7 +25,7 @@ ROR (in JSON) into a corresponding set of RDF triples.
 
 ## Information organisation
 
-The information is expressed using the [GRID
+The information is expressed using a modified version of the [GRID
 ontology](http://owlgred.lumii.lv/online_visualization/6thw).  This is
 because, to a large extent, ROR inherited its database from GRID (not
 too much has changed) and there may be existing users for whom this
@@ -40,6 +40,11 @@ people to read directly.  This repository contains the file
 [`grid-ontology-v1.ttl`](https://github.com/paulmillar/ror-utils/blob/main/map-to-rdf/grid-ontology-v1.ttl),
 which contains the same information but is serialised as Turtle.  You
 may find this version easier to read.
+
+Over time, ROR have modified their schema to include new ideas and
+relationships.  To keep up, the original grid-ontology has been
+updated.  This updated version is available as
+`grid-ontology-v1.1.ttl`.
 
 ## How to map the JSON data.
 
