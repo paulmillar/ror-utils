@@ -639,14 +639,15 @@ def validate_org(org_problems, org, name_by_id):
 
     if "established" in org:
         established = org["established"]
-        if not isinstance(established, int):
-            problem = build_problem(established, "BAD VALUE",
-                                   "The value is not a number")
-            org_problems["established"] = problem
-        elif not is_established_year_ok(org["id"], established):
-            problem = build_problem(established, "BAD VALUE",
-                                   "Year is not (ikely) to be correct")
-            org_problems["established"] = problem
+        if established is not None:
+            if not isinstance(established, int):
+                problem = build_problem(established, "BAD VALUE",
+                                        "The value is not a number")
+                org_problems["established"] = problem
+            elif not is_established_year_ok(org["id"], established):
+                problem = build_problem(established, "BAD VALUE",
+                                        "Year is not (ikely) to be correct")
+                org_problems["established"] = problem
     else:
         org_problems["established"] = build_missing_value_problem()
 
