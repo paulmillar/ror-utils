@@ -317,10 +317,6 @@
   #       'emptyToNull' function to handle any empty strings as if
   #       they were null.
   #
-  #       In addition, ROR contains occational malformed URLs; e.g.,
-  #       ones that contain a trailing whitespace character.  As a
-  #       work-around, we use the 'recogniseUrl' function.
-  #
   rr:predicateObjectMap [
     rr:predicate grid:wikipediaPage;
 
@@ -330,22 +326,11 @@
       fnml:functionValue [
         rr:predicateObjectMap [
           rr:predicate fno:executes;
-          rr:object ref:recogniseUrl
+          rr:object ref:emptyToNull
         ];
         rr:predicateObjectMap [
           rr:predicate ref:p_string_in;
-          rr:objectMap [
-            fnml:functionValue [
-              rr:predicateObjectMap [
-                rr:predicate fno:executes;
-                rr:object ref:emptyToNull
-              ];
-              rr:predicateObjectMap [
-                rr:predicate ref:p_string_in;
-                rr:objectMap [ rml:reference "wikipedia_url" ]
-              ]
-            ]
-	  ]
+          rr:objectMap [ rml:reference "wikipedia_url" ]
         ]
       ]
     ]
@@ -360,16 +345,6 @@
     rr:predicate foaf:homepage;
     rr:objectMap [
       rr:termType rr:IRI;
-
-      fnml:functionValue [
-        rr:predicateObjectMap [
-          rr:predicate fno:executes;
-          rr:object ref:recogniseUrl
-        ];
-        rr:predicateObjectMap [
-          rr:predicate ref:p_string_in ;
-          rr:objectMap [ rml:reference "links[*]" ]
-        ]
-      ]
+      rml:reference "links[*]"
     ]
   ].
