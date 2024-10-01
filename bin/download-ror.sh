@@ -12,8 +12,21 @@
 #  A symbolic link 'latest-ror-data.json' is maintained so it always
 #  points to the latest version.
 
+# URL for fetching the ROR data
 metadata_url="https://zenodo.org/api/records/?communities=ror-data&sort=mostrecent"
-zip_url=$(curl -s "$metadata_url" | jq -r '.hits.hits[0].files[0].links.self')
+# Fetch metadata and follow any redirects
+metadata=$(curl -sL "$metadata_url")
+
+# Parse the metadata to extract the download link
+zip_url=$(echo "$metadata" | jq -r '.hits.hits[0].files[0].links.self')
+
+# Check if jq was able to parse the URL correctly
+if [[ "$zip_url" == "null" || -z "$zip_url" ]]; then
+    echo "Error: Could not find the download URL in the response."
+    exit 1
+fi
+
+echo "Found latest ROR Data Dump at $zip_url"
 zip_filename=${zip_url##*/}
 
 echo "Downloading $zip_filename ..."
