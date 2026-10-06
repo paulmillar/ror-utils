@@ -1,12 +1,23 @@
+# RML mapping for ROR data dumps using ROR Schema v2 (v2.0 / v2.1).
+#
 # Run with
 #
 #  RMLMapper -f functions.ttl -o output.ttl -s turtle -m mapping.ttl
+#
+# Schema v2 changes handled here (compared to the v1 mapping):
+#   * name/aliases/acronyms/labels  -> single 'names' array with 'types'
+#   * addresses/country             -> 'locations[].geonames_details'
+#   * external_ids object (GRID, ISNI, ...) -> array of {type, all, preferred}
+#     with lower-case types; HESA, UCAS, CNRS, OrgRef and UKPRN no longer exist
+#   * links / wikipedia_url         -> 'links' array of {type, value}
+#   * types and relationship types are now lower-case
 #
 @prefix rml: <http://semweb.mmlab.be/ns/rml#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
 @prefix rr: <http://www.w3.org/ns/r2rml#> .
 @prefix ql: <http://semweb.mmlab.be/ns/ql#> .
 @prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix s: <http://schema.org/> .
 @prefix grid: <http://www.grid.ac/ontology/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
@@ -17,6 +28,7 @@
 @prefix fnml: <http://semweb.mmlab.be/ns/fnml#> .
 @prefix ref:  <https://github.com/paulmillar/rml-extra-functions#> .
 @prefix geo:  <http://www.w3.org/2003/01/geo/wgs84_pos#> .
+@prefix geosparql:  <http://www.opengis.net/ont/geosparql#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 
 @base <http://example.com/base/> .
@@ -46,32 +58,33 @@
       rr:predicateObjectMap [
         rr:predicate ref:p_string_path ;
         rr:object "address-0" ]
-    ] ;
+    ];
     rr:termType rr:IRI
   ];
 
   rr:predicateObjectMap [
     rr:predicate owl:sameAs;
     rr:objectMap [
-      rr:template "http://www.grid.ac/institutes/{external_ids.GRID.all}/address-0"
+      rr:termType rr:IRI;
+      rr:template "http://www.grid.ac/institutes/{external_ids[?(@.type==\"grid\")].preferred}/address-0"
     ]
   ];
 
   rr:predicateObjectMap [
     rr:predicate grid:countryCode;
-    rr:objectMap [ rml:reference "country.country_code" ]
+    rr:objectMap [ rml:reference "locations[0].geonames_details.country_code" ]
   ];
 
   rr:predicateObjectMap [
     rr:predicate grid:countryName;
-    rr:objectMap [ rml:reference "country.country_name" ]
+    rr:objectMap [ rml:reference "locations[0].geonames_details.country_name" ]
   ];
 
   rr:predicateObjectMap [
     rr:predicate grid:hasGeonamesCity;
     rr:objectMap [
       rr:termType rr:IRI;
-      rr:template "http://sws.geonames.org/{addresses[0].geonames_city.id}/"
+      rr:template "https://sws.geonames.org/{locations[0].geonames_id}/"
     ]
   ];
 
@@ -79,7 +92,7 @@
     rr:predicate geo:lat;
     rr:objectMap [
       rr:datatype xsd:float;
-      rml:reference "addresses[0].lat"
+      rml:reference "locations[0].geonames_details.lat"
     ]
   ];
 
@@ -87,14 +100,23 @@
     rr:predicate geo:long;
     rr:objectMap [
       rr:datatype xsd:float;
-      rml:reference "addresses[0].lng"
+      rml:reference "locations[0].geonames_details.lng"
     ]
   ];
 
   rr:predicateObjectMap [
     rr:predicate grid:cityName;
     rr:objectMap [
-      rml:reference "addresses[0].city"
+      rml:reference "locations[0].geonames_details.name"
+    ]
+  ];
+
+  rr:predicateObjectMap [
+    rr:predicate geosparql:asWKT;
+    rr:objectMap [
+      rr:termType rr:Literal;
+      rr:datatype geosparql:wktLiteral;
+      rr:template "POINT({locations[0].geonames_details.lng} {locations[0].geonames_details.lat})"
     ]
   ].
 
@@ -120,13 +142,8 @@
     rr:class foaf:Organization
   ];
 
-  rr:predicateObjectMap [
-    rr:predicate rdf:type;
-    rr:objectMap [
-      rr:termType rr:IRI;
-      rr:template "http://www.grid.ac/ontology/{types[*]}"
-    ]
-  ];
+  # Organisation types (rdf:type grid:Education etc.) are mapped by the
+  # per-type TriplesMaps at the end of this file.
 
   #
   # Explicit link to GRID
@@ -134,34 +151,47 @@
   rr:predicateObjectMap [
     rr:predicate owl:sameAs;
     rr:objectMap [
-      rr:template "http://www.grid.ac/institutes/{external_ids.GRID.all}"
+      rr:termType rr:IRI;
+      rr:template "http://www.grid.ac/institutes/{external_ids[?(@.type==\"grid\")].preferred}"
     ]
   ];
 
   #
   # Names and aliases.
   #
-  # TODO add support for "labels"
-  #
   rr:predicateObjectMap [
     rr:predicate skos:prefLabel;
     rr:predicate rdfs:label;
+    rr:predicate s:name;
     rr:objectMap [
-      rml:reference "name"
-   ]
-  ];
-
-  rr:predicateObjectMap [
-    rr:predicate skos:altLabel;
-    rr:objectMap [
-      rml:reference "aliases[*]"
+      rml:reference "names[?(@.types anyof ['ror_display'])].value"
     ]
   ];
 
   rr:predicateObjectMap [
+    rr:predicate skos:altLabel;
+    rr:predicate rdfs:label;
+    rr:predicate s:alternateName;
+    rr:objectMap [
+      rml:reference "names[?(@.types anyof ['alias'])].value"
+    ]
+  ];
+
+  # label (other than the display name) -> names in other languages
+  rr:predicateObjectMap [
+    rr:predicate skos:altLabel;
+    rr:predicate rdfs:label;
+    rr:predicate s:alternateName;
+    rr:objectMap [
+      rml:reference "names[?(@.types anyof ['label'] && @.types noneof ['ror_display'])].value"
+    ]
+  ];
+
+  # acronym
+  rr:predicateObjectMap [
     rr:predicate vivo:abbreviation;
     rr:objectMap [
-      rml:reference "acronyms[*]"
+      rml:reference "names[?(@.types anyof ['acronym'])].value"
     ]
   ];
 
@@ -172,20 +202,7 @@
     rr:predicate grid:establishedYear;
     rr:objectMap [
       rr:datatype xsd:gYear;
-
-      # Note that xsd:gYear requires years to have the form YYYY, so
-      # we must zero-pad integer values.
-      fnml:functionValue [
-        rr:predicateObjectMap [
-          rr:predicate fno:executes ;
-          rr:object ref:withLeadingZeros ] ;
-        rr:predicateObjectMap [
-          rr:predicate ref:p_int_in ;
-          rr:objectMap [ rml:reference "established" ] ] ;
-        rr:predicateObjectMap [
-          rr:predicate ref:p_int_count ;
-          rr:object  "4" ]
-      ]
+      rml:reference "established"
     ]
   ];
 
@@ -207,26 +224,31 @@
         rr:predicateObjectMap [
           rr:predicate ref:p_string_path ;
           rr:object "address-0" ]
-      ]
+      ];
+      rr:termType rr:IRI
     ]
   ];
 
   #
   # Various IDs.
   #
+  # v2 'external_ids' is an array of {type, all, preferred}; allowed
+  # types are fundref, grid, isni and wikidata.  The v1-only HESA, UCAS,
+  # CNRS, OrgRef and UKPRN identifiers were dropped by ROR.
+  #
   # TODO: add the ROR id.
   #
   rr:predicateObjectMap [
     rr:predicate grid:isni;
     rr:objectMap [
-      rml:reference "external_ids.ISNI.all[*]"
+      rml:reference "external_ids[?(@.type==\"isni\")].all[*]"
     ]
   ];
 
   rr:predicateObjectMap [
     rr:predicate grid:crossrefFunderId;
     rr:objectMap [
-      rml:reference "external_ids.FundRef.all[*]"
+      rml:reference "external_ids[?(@.type==\"fundref\")].all[*]"
     ]
   ];
 
@@ -234,21 +256,15 @@
     rr:predicate grid:hasWikidataId;
     rr:objectMap [
       rr:termType rr:IRI;
-      rr:template "http://www.wikidata.org/entity/{external_ids.Wikidata.all[*]}"
+      rr:template "http://www.wikidata.org/entity/{external_ids[?(@.type==\"wikidata\")].all[*]}"
     ]
   ];
 
+  # Not actively curated
   rr:predicateObjectMap [
     rr:predicate grid:id;
     rr:objectMap [
-      rml:reference "external_ids.GRID.all"
-    ]
-  ];
-
-  rr:predicateObjectMap [
-    rr:predicate grid:ukprn;
-    rr:objectMap [
-      rml:reference "external_ids.UKPRN.all[*]"
+      rml:reference "external_ids[?(@.type==\"grid\")].preferred"
     ]
   ];
 
@@ -256,15 +272,14 @@
   #
   # Relationships to other organisations.
   #
-  # Note: the ROR data includes the relationship type "Other".  This
-  #       is a relic from GRID.  Such relationships are not supported
-  #       and will go away.
+  # v2 relationship types are lower-case: related, parent, child,
+  # predecessor, successor.  (The GRID-era "Other" type is gone.)
   #
   rr:predicateObjectMap [
     rr:predicate grid:hasRelated;
     rr:objectMap [
       rr:termType rr:IRI;
-      rml:reference "relationships[?(@.type==\"Related\")].id"
+      rml:reference "relationships[?(@.type==\"related\")].id"
     ]
   ];
 
@@ -272,7 +287,7 @@
     rr:predicate grid:hasChild;
     rr:objectMap [
       rr:termType rr:IRI;
-      rml:reference "relationships[?(@.type==\"Child\")].id"
+      rml:reference "relationships[?(@.type==\"child\")].id"
     ]
   ];
 
@@ -280,7 +295,7 @@
     rr:predicate grid:hasParent;
     rr:objectMap [
       rr:termType rr:IRI;
-      rml:reference "relationships[?(@.type==\"Parent\")].id"
+      rml:reference "relationships[?(@.type==\"parent\")].id"
     ]
   ];
 
@@ -288,7 +303,7 @@
     rr:predicate grid:hasPredecessor;
     rr:objectMap [
       rr:termType rr:IRI;
-      rml:reference "relationships[?(@.type==\"Predecessor\")].id"
+      rml:reference "relationships[?(@.type==\"predecessor\")].id"
     ]
   ];
 
@@ -296,55 +311,148 @@
     rr:predicate grid:hasSuccessor;
     rr:objectMap [
       rr:termType rr:IRI;
-      rml:reference "relationships[?(@.type==\"Successor\")].id"
+      rml:reference "relationships[?(@.type==\"successor\")].id"
+    ]
+  ];
+
+  # v2 values: active, inactive, withdrawn
+  rr:predicateObjectMap [
+    rr:predicate grid:status;
+    rr:objectMap [
+      rml:reference "status"
     ]
   ];
 
   #
   # Links to web pages.
   #
-  # Note: ROR currently uses a mixture of null and empty strings to
-  #       represent missing 'wikipedia_url' values.  This is wrong and
-  #       will be fixed by only using null values in some future
-  #       release of ROR.
-  #
-  #       RMLMapper does not generate triples for any null values;
-  #       however, it will try to map the empty string to a
-  #       corresponding IRI.  This fails because an empty string is
-  #       not a valid IRI.
-  #
-  #       While waiting for ROR to fix this inconsistency, use the
-  #       'emptyToNull' function to handle any empty strings as if
-  #       they were null.
+  # v2: 'wikipedia_url' and 'links' are merged into a single 'links'
+  # array of {type, value} with type 'website' or 'wikipedia'.  Missing
+  # links are simply absent, so the old 'emptyToNull' workaround for
+  # empty wikipedia_url strings is no longer needed.
   #
   rr:predicateObjectMap [
     rr:predicate grid:wikipediaPage;
-
     rr:objectMap [
       rr:termType rr:IRI;
-
-      fnml:functionValue [
-        rr:predicateObjectMap [
-          rr:predicate fno:executes;
-          rr:object ref:emptyToNull
-        ];
-        rr:predicateObjectMap [
-          rr:predicate ref:p_string_in;
-          rr:objectMap [ rml:reference "wikipedia_url" ]
-        ]
-      ]
+      rml:reference "links[?(@.type==\"wikipedia\")].value"
     ]
   ];
 
-
-  # Note: ROR has occational malformed URLs; e.g., ones that contain a
-  #       trailing whitespace character.  As a work-around, we use the
-  #       'recogniseUrl' function.
-  #
   rr:predicateObjectMap [
     rr:predicate foaf:homepage;
     rr:objectMap [
       rr:termType rr:IRI;
-      rml:reference "links[*]"
+      rml:reference "links[?(@.type==\"website\")].value"
     ]
+  ].
+
+
+##
+##  ORGANISATION TYPES
+##
+##  v2 types are lower-case (education, funder, healthcare, company,
+##  archive, nonprofit, government, facility, other), whereas the GRID
+##  ontology classes are title-case.  One TriplesMap per type selects the
+##  matching records and asserts the corresponding class.
+##  Note: 'funder' is new in ROR and has no GRID equivalent.
+##
+
+<TypeEducationMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['education'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Education
+  ].
+
+<TypeFunderMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['funder'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Funder
+  ].
+
+<TypeHealthcareMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['healthcare'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Healthcare
+  ].
+
+<TypeCompanyMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['company'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Company
+  ].
+
+<TypeArchiveMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['archive'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Archive
+  ].
+
+<TypeNonprofitMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['nonprofit'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Nonprofit
+  ].
+
+<TypeGovernmentMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['government'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Government
+  ].
+
+<TypeFacilityMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['facility'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Facility
+  ].
+
+<TypeOtherMap> a rr:TriplesMap;
+  rml:logicalSource [
+    rml:source "latest-ror-data.json";
+    rml:referenceFormulation ql:JSONPath;
+    rml:iterator "$[?(@.types anyof ['other'])]"
+  ];
+  rr:subjectMap [
+    rml:reference "id";
+    rr:class grid:Other
   ].
