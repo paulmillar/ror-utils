@@ -13,11 +13,10 @@ maintenance of their database to ROR.  There are no more releases of
 the GRID database.
 
 Currently, ROR provides their registry database in a [JSON
-format](https://ror.readme.io/docs/ror-data-structure) only.  They do
-not provide an RDF representation of that information, although there
-there is an [open
-issue](https://github.com/ror-community/ror-api/issues/113) to address
-this.
+format](https://ror.readme.io/docs/ror-data-structure) only.  They do not
+provide an RDF representation of that information, although there there is an
+[open issue](https://github.com/ror-community/ror-roadmap/issues/125) in their
+roadmap to address this.
 
 This directory contains material that overcomes this limitation and
 solves this issue.  It provides a way to convert the information from
